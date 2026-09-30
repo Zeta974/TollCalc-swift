@@ -6,7 +6,7 @@ public struct TollStation: Identifiable, Hashable, Sendable {
     public let id: String
     /// Name exactly as printed in the official grid.
     public let name: String
-    /// Operator station code when the grid publishes one (AREA does).
+    /// Station code (AREA) or exit number (VINCI grids) when the grid publishes one.
     public let code: String?
     public let networkID: String
     /// Mean position of the station's booths (from OpenStreetMap), if known.
@@ -25,8 +25,8 @@ public struct TollStation: Identifiable, Hashable, Sendable {
 public struct Fare: Hashable, Sendable {
     public let entry: TollStation
     public let exit: TollStation
-    /// Tariff distance ("distance tarifaire") in metres, as published.
-    public let distanceMeters: Int
+    /// Tariff distance ("distance tarifaire") in metres, when the grid publishes it.
+    public let distanceMeters: Int?
     let prices: [Money]
 
     public func price(for vehicleClass: VehicleClass) -> Money {
@@ -38,7 +38,7 @@ public struct Fare: Hashable, Sendable {
 public struct TollNetwork: Identifiable, Sendable {
     public let id: String
     public let name: String
-    /// Date the tariffs came into force (tariffs change every 1 February).
+    /// Date the tariffs came into force (usually 1 February; ASF also revised on 1 June 2026).
     public let validFrom: String
     public let source: URL
     public let stations: [TollStation]
@@ -52,7 +52,7 @@ public struct TollNetwork: Identifiable, Sendable {
     }
 
     struct Row {
-        let distanceMeters: Int
+        let distanceMeters: Int?
         let prices: [Money]
     }
 
@@ -121,7 +121,7 @@ extension TollNetwork: Decodable {
         }
         stationsByKey = keys
 
-        // [entry, exit, distanceMeters, class1 … class5] — prices in cents.
+        // [entry, exit, distanceMeters (-1 if unpublished), class1 … class5] — prices in cents.
         let rows = try c.decode([[Int]].self, forKey: .fares)
         var table: [Pair: Row] = [:]
         table.reserveCapacity(rows.count)
@@ -131,19 +131,20 @@ extension TollNetwork: Decodable {
                     debugDescription: "Malformed fare row \(row) in \(networkID)")
             }
             table[Pair(entry: Int32(row[0]), exit: Int32(row[1]))] =
-                Row(distanceMeters: row[2], prices: row[3...7].map { Money(cents: $0) })
+                Row(distanceMeters: row[2] >= 0 ? row[2] : nil, prices: row[3...7].map { Money(cents: $0) })
         }
         fareTable = table
     }
 }
 
 /// Station-name normalisation shared by every grid, so "BELLEVILLE S/SAONE"
-/// and "Belleville-sur-Saône" resolve to the same key.
+/// and "Belleville-sur-Saône" resolve to the same key. "Péage de" is kept:
+/// "Péage de Biriatou" (the barrier) and "Biriatou" (the exit) are different
+/// stations. Must match `app_key` in Tools/build_tariffs.py.
 public enum StationName {
     public static func key(_ name: String) -> String {
         var s = name.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "fr_FR"))
             .uppercased()
-        s = s.replacingOccurrences(of: #"\bPEAGE (DE |D')?"#, with: "", options: .regularExpression)
         s = s.replacingOccurrences(of: #"(\bS)?/\s*"#, with: " SUR ", options: .regularExpression)
         s = s.replacingOccurrences(of: #"\bCH\."#, with: "CHATEAU ", options: .regularExpression)
         s = s.replacingOccurrences(of: "SAINTE", with: "STE").replacingOccurrences(of: "SAINT", with: "ST")

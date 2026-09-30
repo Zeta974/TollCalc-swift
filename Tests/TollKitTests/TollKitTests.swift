@@ -13,7 +13,11 @@ final class TollKitTests: XCTestCase {
         XCTAssertEqual(byID["aprr"]?.fareCount, 21_505)
         XCTAssertEqual(byID["area"]?.fareCount, 815)
         XCTAssertEqual(byID["aliae"]?.fareCount, 324)
-        XCTAssertTrue(database.networks.allSatisfy { $0.validFrom == "2026-02-01" })
+        XCTAssertEqual(byID["cofiroute"]?.fareCount, 11_004)
+        XCTAssertEqual(byID["asf"]?.fareCount, 18_508)
+        XCTAssertEqual(byID["escota"]?.fareCount, 2_260)
+        XCTAssertEqual(byID["asf"]?.validFrom, "2026-06-01")  // ASF revised its grid on 1 June 2026
+        XCTAssertTrue(database.networks.filter { $0.id != "asf" }.allSatisfy { $0.validFrom == "2026-02-01" })
     }
 
     // MARK: - Prices copied from the official PDFs (1 February 2026)
@@ -48,6 +52,74 @@ final class TollKitTests: XCTestCase {
         // "ALLAINES DEUX CHAISES 261,00 28,90 € 46,00 € 71,70 € 96,20 € 17,60 €"
         let quote = try calculator.quote(from: "ALLAINES", to: "DEUX CHAISES", vehicleClass: .class5)
         XCTAssertEqual(quote.total, Money(cents: 1760))
+    }
+
+    // MARK: - VINCI Autoroutes
+    //
+    // Expected values come from VINCI's own "Tarifs des principales liaisons
+    // 2026" table and the guides' worked examples, which are printed
+    // separately from the charts the grids are parsed from.
+
+    private func assertAllClasses(_ entry: String, _ exit: String, _ euros: [String],
+                                  network: String, file: StaticString = #filePath, line: UInt = #line) throws {
+        for (vehicleClass, expected) in zip(VehicleClass.allCases, euros) {
+            let quote = try calculator.quote(from: entry, to: exit, vehicleClass: vehicleClass)
+            XCTAssertEqual(quote.total.formatted, expected, "\(entry) → \(exit) \(vehicleClass)", file: file, line: line)
+            XCTAssertEqual(quote.lines.first?.networkID, network, file: file, line: line)
+        }
+    }
+
+    func testASFMatchesPublishedLiaisons() throws {
+        // "A9 Montpellier / Espagne (Perthus) 23,10 € 35,30 € 50,90 € 62,50 € 13,00 €"
+        try assertAllClasses("Montpellier est", "Péage du Perthus",
+                             ["23,10 €", "35,30 €", "50,90 €", "62,50 €", "13,00 €"], network: "asf")
+        // "A9 Montpellier / Narbonne-est 9,70 € 14,70 € 21,50 € 27,50 € 5,60 €"
+        try assertAllClasses("Montpellier est", "Narbonne est",
+                             ["9,70 €", "14,70 €", "21,50 €", "27,50 €", "5,60 €"], network: "asf")
+        // "A10 Tours Centre (Sorigny) / Bordeaux (Virsac) 34,90 € 53,50 € 79,30 € 105,00 € 21,50 €"
+        try assertAllClasses("Péage de Tours centre", "Péage de Virsac",
+                             ["34,90 €", "53,50 €", "79,30 €", "105,00 €", "21,50 €"], network: "asf")
+    }
+
+    func testEscotaMatchesPublishedLiaisons() throws {
+        // "A8 Aix / Nice 21,20 € 31,50 € 45,00 € 62,60 € 13,00 €"
+        try assertAllClasses("Aix (A57, A50, A52, A8)", "Nice-ouest",
+                             ["21,20 €", "31,50 €", "45,00 €", "62,60 €", "13,00 €"], network: "escota")
+        // "A51 Aix / Gap (La Saulce) 14,90 € 20,60 € 28,90 € 42,00 € 8,70 €"
+        try assertAllClasses("Aix (A51)", "La Saulce",
+                             ["14,90 €", "20,60 €", "28,90 €", "42,00 €", "8,70 €"], network: "escota")
+        // Guide example: "La Saulce > Peyruis = 5,70 €"
+        XCTAssertEqual(try calculator.quote(from: "La Saulce", to: "Peyruis", vehicleClass: .class1).total.formatted,
+                       "5,70 €")
+    }
+
+    func testCofirouteRowVerbatim() throws {
+        // "A11 1 ABLIS A28 18 ALENCON NORD 21,80 € 33,70 € 52,30 € 72,90 € 12,90 €"
+        let cofiroute = try XCTUnwrap(database.networks.first { $0.id == "cofiroute" })
+        let fare = try XCTUnwrap(cofiroute.fare(from: try station("ABLIS"), to: try station("ALENCON NORD")))
+        XCTAssertEqual(VehicleClass.allCases.map { fare.price(for: $0).formatted },
+                       ["21,80 €", "33,70 €", "52,30 €", "72,90 €", "12,90 €"])
+        XCTAssertEqual(fare.entry.code, "1")
+        XCTAssertNil(fare.distanceMeters)
+        // ASF prints the same trip in its A11/A28 chart; both grids agree.
+        XCTAssertEqual(try calculator.quote(from: "ABLIS", to: "ALENCON NORD", vehicleClass: .class4).total,
+                       Money(cents: 7290))
+    }
+
+    func testChartsAreSymmetric() throws {
+        for network in database.networks where ["asf", "escota"].contains(network.id) {
+            for fare in network.allFares {
+                XCTAssertEqual(network.fare(from: fare.exit, to: fare.entry)?.price(for: .class1),
+                               fare.price(for: .class1), "\(fare.entry.name) ↔ \(fare.exit.name)")
+            }
+        }
+    }
+
+    func testSameNamedStationsAreKeptApart() {
+        // A837 has two exits called Tonnay-Charente; a barrier is not the exit it is named after.
+        XCTAssertNotNil(database.station(named: "Tonnay-Charente (sortie 33)"))
+        XCTAssertNotNil(database.station(named: "Tonnay-Charente (sortie 34)"))
+        XCTAssertNotEqual(database.station(named: "Péage de Biriatou")?.key, database.station(named: "Biriatou")?.key)
     }
 
     func testNameLookupIgnoresAccentsCaseAndAbbreviations() {

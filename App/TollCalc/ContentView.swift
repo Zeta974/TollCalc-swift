@@ -122,8 +122,9 @@ struct QuoteSection: View {
                             Text("non publié").foregroundStyle(.orange)
                         }
                     }
-                    if let network = line.networkID, let meters = line.distanceMeters {
-                        Text("\(network.uppercased()) · \(meters / 1000) km tarifaires")
+                    if let network = line.networkID {
+                        Text(line.distanceMeters.map { "\(network.uppercased()) · \($0 / 1000) km tarifaires" }
+                             ?? network.uppercased())
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
