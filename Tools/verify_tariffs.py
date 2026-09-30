@@ -122,11 +122,84 @@ def check_asf_guide():
     return ok
 
 
+def check_journal_officiel():
+    """The JO tables are parsed from the ruled table cells; here the page's
+    plain text is used instead. Per network and class, the prices printed in
+    the text must be exactly the prices in the JSON (as a multiset)."""
+    import re
+    from build_tariffs import JO_FILE, JO_TRIANGLES
+    ok = True
+    with pdfplumber.open(RAW / JO_FILE) as pdf:
+        for annex, (net_id, _, pages) in JO_TRIANGLES.items():
+            text = "\n".join(pdf.pages[p].extract_text() or "" for p in pages)
+            # split by class heading ("Véhicules de classe k", or SFTRF's "Classe k Aiton …")
+            parts = re.split(r"Véhicules de classe (\d)", text)
+            printed = {int(parts[i]): Counter(re.findall(r"\b\d+,\d{2}\b", parts[i + 1]))
+                       for i in range(1, len(parts), 2)}
+            doc = json.loads((NETWORKS / f"{net_id}.json").read_text())
+            names = [s["name"] for s in doc["stations"]]
+            pairs = {}
+            for f in doc["fares"]:
+                pairs[frozenset((f[0], f[1]))] = f[3:8]
+            # ATMB prints one row for both Findrol and Scientrier: their prices to
+            # the eight stations before them are printed once for the two.
+            shared = set()
+            if net_id == "atmb":
+                before = ["Chatillon", "Bellegarde", "Eloise", "Saint-Julien", "Genève", "Archamps", "Gaillard",
+                          "Etrembières - Annemasse"]
+                shared = {frozenset((names.index("Scientrier"), names.index(b))) for b in before}
+            network_ok = True
+            for k in range(1, 6):
+                expected = Counter(eur(v[k - 1]).replace(" €", "") for pair, v in pairs.items() if pair not in shared)
+                if expected != printed.get(k):
+                    network_ok = False
+                    print(f"  {net_id} class {k}: JSON {sum(expected.values())} prices, "
+                          f"text {sum(printed.get(k, Counter()).values())}; differs: "
+                          f"{list(((expected - printed.get(k, Counter())) + (printed.get(k, Counter()) - expected)).items())[:6]}")
+            ok &= network_ok
+            print(f"{net_id}: {len(pairs)} trips x 5 classes vs JO text -> {'OK' if network_ok else 'MISMATCH'}")
+    return ok
+
+
+def check_points():
+    """Point tolls with two independent sources."""
+    import re
+    import points
+    ok = True
+    # Millau: JO annex III vs the viaduct's own 2026 leaflet
+    jo = {p["when"]["season"][0][0]: p["prices"] for p in points.millau()[0]["tariff"]["periods"]}
+    with pdfplumber.open(RAW / "other" / "millau-2026.pdf") as pdf:
+        text = pdf.pages[-1].extract_text()
+    rows = re.findall(r"^(\d+,\d{2}) € (\d+,\d{2}) €$", text, re.M)[-5:]
+    leaflet_off = [points.cents(a) for a, _ in rows]
+    leaflet_summer = [points.cents(b) for _, b in rows]
+    same = ([jo["09-16"][k] for k in "12345"] == leaflet_off and [jo["06-15"][k] for k in "12345"] == leaflet_summer)
+    ok &= same
+    print(f"cevm (Millau): JO annex III vs viaduct leaflet -> {'OK' if same else 'MISMATCH'}")
+    # Mont-Blanc and Fréjus: identical tariffs on the French side (bilateral agreement)
+    mb = points.mont_blanc()[0]["tariff"]["periods"][0]["prices"]
+    fr = points.frejus()[0]["tariff"]["periods"][0]["prices"]
+    same = mb == fr
+    ok &= same
+    print(f"tunnels: Mont-Blanc (ATMB page) vs Fréjus (SFTRF leaflet), France side -> {'OK' if same else 'MISMATCH'}")
+    return ok
+
+
+def check_a355():
+    import points
+    slots = points.verify_a355_against_vinci()
+    print(f"arcos (A355): {slots} half-hour slots of VINCI's leaflet match the JO time bands -> OK")
+    return True
+
+
 results = [
     check("aprr", "TARIFS_APRR.pdf", named),
     check("area", "TARIFS_INTERNES_AREA.pdf", area),
     check("aliae", "TARIFS_ALIAE-2026.pdf", named),
     check_cofiroute(),
     check_asf_guide(),
+    check_journal_officiel(),
+    check_a355(),
+    check_points(),
 ]
 sys.exit(0 if all(results) else 1)

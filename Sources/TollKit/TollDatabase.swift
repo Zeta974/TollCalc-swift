@@ -9,7 +9,10 @@ public struct TollDatabase: Sendable {
     public let networks: [TollNetwork]
     /// One entry per physical station, sorted by name, booths merged across grids.
     public let stations: [TollStation]
+    /// Every barrier, bridge or section priced on its own.
+    public let points: [TollPoint]
     private let stationsByKey: [String: TollStation]
+    private let pointsByKey: [String: TollPoint]
 
     public init(networks: [TollNetwork]) {
         self.networks = networks
@@ -18,10 +21,14 @@ public struct TollDatabase: Sendable {
             for station in network.stations {
                 if let existing = merged[station.key] {
                     let booths = existing.booths + station.booths.filter { !existing.booths.contains($0) }
+                    let junctions = existing.junctions + station.junctions.filter { !existing.junctions.contains($0) }
+                    // Prefer a booth position over an interchange position.
+                    let location = existing.booths.isEmpty && !station.booths.isEmpty
+                        ? station.location : (existing.location ?? station.location)
                     merged[station.key] = TollStation(
                         id: existing.id, name: existing.name, code: existing.code ?? station.code,
-                        networkID: existing.networkID, location: existing.location ?? station.location,
-                        booths: booths)
+                        networkID: existing.networkID, location: location,
+                        booths: booths, junctions: junctions, isVirtual: existing.isVirtual && station.isVirtual)
                 } else {
                     merged[station.key] = station
                 }
@@ -29,6 +36,8 @@ public struct TollDatabase: Sendable {
         }
         stationsByKey = merged
         stations = merged.values.sorted { $0.name < $1.name }
+        points = networks.flatMap(\.points).sorted { $0.name < $1.name }
+        pointsByKey = Dictionary(points.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
     /// Loads the grids bundled with TollKit (`Resources/networks/*.json`).
@@ -46,6 +55,22 @@ public struct TollDatabase: Sendable {
 
     public func station(named name: String) -> TollStation? {
         stationsByKey[StationName.key(name)]
+    }
+
+    public func point(named name: String) -> TollPoint? {
+        pointsByKey[StationName.key(name)]
+    }
+
+    /// A station or a toll point with this name.
+    public func stop(named name: String) -> TollStop? {
+        station(named: name).map(TollStop.station) ?? point(named: name).map(TollStop.point)
+    }
+
+    /// Stations and toll points whose name contains every word of `query`.
+    public func searchStops(_ query: String) -> [TollStop] {
+        let words = StationName.key(query).split(separator: " ")
+        let stops = stations.map(TollStop.station) + points.map(TollStop.point)
+        return stops.filter { stop in words.allSatisfy { stop.key.contains($0) } }
     }
 
     /// Stations whose name contains every word of `query` (accent/case insensitive).

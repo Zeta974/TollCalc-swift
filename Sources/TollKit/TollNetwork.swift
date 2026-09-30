@@ -9,10 +9,28 @@ public struct TollStation: Identifiable, Hashable, Sendable {
     /// Station code (AREA) or exit number (VINCI grids) when the grid publishes one.
     public let code: String?
     public let networkID: String
-    /// Mean position of the station's booths (from OpenStreetMap), if known.
+    /// Position of the station (its booths, or its interchange), if known.
     public let location: GeoPoint?
-    /// Every known booth of the station; used to detect passages along a route.
+    /// Every known toll booth of the station (OpenStreetMap).
     public let booths: [GeoPoint]
+    /// When no booth is mapped: the motorway exit nodes of the station's
+    /// interchange, both carriageways (OpenStreetMap `motorway_junction`).
+    public let junctions: [GeoPoint]
+    /// Not a place you can enter or leave: a concession limit, a motorway
+    /// fork, the open-system marker or a border. Never has a location.
+    public let isVirtual: Bool
+
+    public init(id: String, name: String, code: String?, networkID: String, location: GeoPoint?,
+                booths: [GeoPoint], junctions: [GeoPoint] = [], isVirtual: Bool = false) {
+        self.id = id
+        self.name = name
+        self.code = code
+        self.networkID = networkID
+        self.location = location
+        self.booths = booths
+        self.junctions = junctions
+        self.isVirtual = isVirtual
+    }
 
     /// Normalised name shared by the same physical station across grids.
     public var key: String { StationName.key(name) }
@@ -42,6 +60,8 @@ public struct TollNetwork: Identifiable, Sendable {
     public let validFrom: String
     public let source: URL
     public let stations: [TollStation]
+    /// Barriers, bridges and sections priced on their own.
+    public let points: [TollPoint]
 
     private let fareTable: [Pair: Row]
     private let stationsByKey: [String: Int]
@@ -82,7 +102,17 @@ public struct TollNetwork: Identifiable, Sendable {
 
 extension TollNetwork: Decodable {
     private enum CodingKeys: String, CodingKey {
-        case id, name, validFrom, source, stations, fares
+        case id, name, validFrom, source, stations, fares, points
+    }
+
+    private struct RawPoint: Decodable {
+        let id: String
+        let name: String
+        let kind: TollPoint.Kind
+        let lat: Double?
+        let lon: Double?
+        let booths: [[Double]]?
+        let tariff: PointTariff
     }
 
     private struct RawStation: Decodable {
@@ -92,6 +122,8 @@ extension TollNetwork: Decodable {
         let lat: Double?
         let lon: Double?
         let booths: [[Double]]?
+        let junctions: [[Double]]?
+        let virtual: Bool?
     }
 
     public init(from decoder: Decoder) throws {
@@ -108,7 +140,9 @@ extension TollNetwork: Decodable {
                 code: raw.code,
                 networkID: networkID,
                 location: raw.lat.flatMap { lat in raw.lon.map { GeoPoint(latitude: lat, longitude: $0) } },
-                booths: (raw.booths ?? []).compactMap { $0.count == 2 ? GeoPoint(latitude: $0[0], longitude: $0[1]) : nil }
+                booths: (raw.booths ?? []).compactMap { $0.count == 2 ? GeoPoint(latitude: $0[0], longitude: $0[1]) : nil },
+                junctions: (raw.junctions ?? []).compactMap { $0.count == 2 ? GeoPoint(latitude: $0[0], longitude: $0[1]) : nil },
+                isVirtual: raw.virtual ?? false
             )
         }
 
@@ -134,6 +168,13 @@ extension TollNetwork: Decodable {
                 Row(distanceMeters: row[2] >= 0 ? row[2] : nil, prices: row[3...7].map { Money(cents: $0) })
         }
         fareTable = table
+
+        points = try (c.decodeIfPresent([RawPoint].self, forKey: .points) ?? []).map { raw in
+            TollPoint(id: raw.id, name: raw.name, kind: raw.kind, networkID: networkID,
+                      location: raw.lat.flatMap { lat in raw.lon.map { GeoPoint(latitude: lat, longitude: $0) } },
+                      booths: (raw.booths ?? []).compactMap { $0.count == 2 ? GeoPoint(latitude: $0[0], longitude: $0[1]) : nil },
+                      tariff: raw.tariff)
+        }
     }
 }
 
