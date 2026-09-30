@@ -42,4 +42,13 @@ public enum TripInput: String, Hashable, Sendable, Codable, CaseIterable {
     case axles
     /// `Vehicle.grossWeightTonnes`
     case grossWeight
+    /// Which Sanef A1 tariff level applies (normal, green or red). Sanef sets
+    /// the green and red periods; the calendar is not part of the bundled data.
+    case sanefA1Period
+}
+
+/// Class 1 tariff levels Sanef applies on the A1 towards Paris
+/// (grille "Modulation horaire des tarifs sur A1").
+public enum SanefA1Period: String, CaseIterable, Codable, Sendable {
+    case normal, green, red
 }

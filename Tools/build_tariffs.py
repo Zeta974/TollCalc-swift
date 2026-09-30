@@ -22,6 +22,7 @@ from pathlib import Path
 import pdfplumber
 
 import points as point_tolls
+import sanef
 import vinci_charts
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -39,6 +40,13 @@ ALIASES = {
 CROSS_NETWORK_OPERATORS = ["APRR", "AREA", "COFIROUTE", "SANEF", "ALIAE", "ALICORNE", "ASF", "ARCOUR", "ATMB"]
 
 SOURCES = {
+    "sanef": {"name": "Sanef", "file": "sanef/2026_02-Grille-Sanef.pdf",
+              "url": "https://www.autoroutes.sanef.com/sites/default/files/2026-01/2026_02-Grille-Sanef.pdf",
+              "validFrom": "2026-02-01", "osmOperators": CROSS_NETWORK_OPERATORS + ["SAPN"],
+              "modulationUrl": "https://www.autoroutes.sanef.com/sites/default/files/2026-02/grille-modulee-01022026.pdf"},
+    "sapn": {"name": "SAPN", "file": "sanef/2026_02-Grille-SAPN.pdf",
+             "url": "https://www.autoroutes.sanef.com/sites/default/files/2026-01/2026_02-Grille-SAPN.pdf",
+             "validFrom": "2026-02-01", "osmOperators": CROSS_NETWORK_OPERATORS + ["SAPN"]},
     **{net_id: {
         "name": name,
         "file": "jo/joe_20260130_0025_0037.pdf",
@@ -649,7 +657,11 @@ def locate_junctions(net_id, stations):
             todo.append(s)
     for s in list(todo):
         if s.get("road") and s.get("code"):
-            groups = _clusters(by_road_ref.get((s["road"].replace(" ", ""), _ref_key(s["code"])), []))
+            # a grid may give the section's motorways ("A13,A29"): the exit number
+            # must then identify a single interchange across all of them
+            nodes = [j for road in s["road"].split(",")
+                     for j in by_road_ref.get((road.replace(" ", ""), _ref_key(s["code"])), [])]
+            groups = _clusters(nodes)
             if len(groups) == 1:
                 place(s, groups[0], "road+exit")
                 todo.remove(s)
@@ -683,7 +695,7 @@ def locate_junctions(net_id, stations):
         print(f"  {net_id}: placed at interchanges by " + ", ".join(f"{k} {v}" for k, v in counts.items() if v))
 
 
-def build(net_id, meta, rows, osm):
+def build(net_id, meta, rows, osm, modulations=None):
     # one spelling per station ("VILLEFRANCHE NORD" / "VILLEFRANCHE-NORD")
     spelling = {}
     for en, xn, *_ in rows:
@@ -720,6 +732,13 @@ def build(net_id, meta, rows, osm):
     located = sum(1 for s in stations if "lat" in s)
     for s in stations:
         s.pop("road", None)
+    # time-modulated class 1 fares: [entry, exit, normal, green, red]
+    mods = []
+    for entry, exit_, levels in modulations or []:
+        e, x = index[spelling[app_key(entry)]], index[spelling[app_key(exit_)]]
+        if seen[(e, x)][1][0] != levels["normal"]:
+            sys.exit(f"{net_id}: modulation {entry} -> {exit_} does not match the grid")
+        mods.append([e, x, levels["normal"], levels["green"], levels["red"]])
     doc = {
         "id": net_id,
         "name": meta["name"],
@@ -729,6 +748,7 @@ def build(net_id, meta, rows, osm):
         "fareColumns": ["entry", "exit", "distanceMeters", "class1", "class2", "class3", "class4", "class5"],
         "stations": stations,
         "fares": fares,
+        **({"class1Modulations": mods, "modulationSource": meta["modulationUrl"]} if mods else {}),
     }
     OUT.mkdir(parents=True, exist_ok=True)
     with open(OUT / f"{net_id}.json", "w") as f:
@@ -772,12 +792,17 @@ def main():
         "asf": lambda: parse_charts("asf", SOURCES["asf"]),
         "escota": lambda: parse_charts("escota", SOURCES["escota"]),
         "sftrf": lambda: parse_jo_matrix([6, 7]),
+        "sanef": lambda: sanef.parse_grid("2026_02-Grille-Sanef.pdf"),  # A1 modulation added below
+        "sapn": lambda: sanef.parse_grid("2026_02-Grille-SAPN.pdf"),
         **{net_id: (lambda pages=pages: parse_jo_triangle(pages))
            for annex, (net_id, _, pages) in JO_TRIANGLES.items() if net_id != "sftrf"},
     }
     for net_id in sys.argv[1:] or [*parsers, *point_tolls.POINT_NETWORKS]:
         if net_id in point_tolls.POINT_NETWORKS:
             build_points(net_id, osm)
+        elif net_id == "sanef":
+            rows = parsers[net_id]()
+            build(net_id, SOURCES[net_id], rows, osm, sanef.parse_a1_modulation(rows))
         else:
             build(net_id, SOURCES[net_id], parsers[net_id](), osm)
 

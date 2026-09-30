@@ -29,13 +29,16 @@ borders); they are priced but never detected on a route.
 | Tunnel du Fréjus (SFTRF) | 2026-01-01 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
 | Ponts de Normandie et de Tancarville (CCI Seine Estuaire) | 2026-05-01 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
 | Tunnel du Puymorens (ASF) | 2026-02-01 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
+| Sanef | 2026-02-01 | 2,734 | 0 | 96 | 0 | 67 | 5 | 24 |
+| SAPN (A14 Montesson, Chambourcy) | 2026-02-01 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
+| SAPN | 2026-02-01 | 310 | 0 | 28 | 0 | 10 | 2 | 16 |
 | SFTRF (A43 Maurienne) | 2026-02-01 | 30 | 0 | 7 | 0 | 2 | 5 | 0 |
 | Tunnel du Mont-Blanc (ATMB / GEIE-TMB) | 2026-01-01 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
 | Tunnel Maurice-Lemaire (APRR) | 2026-02-01 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **Total** | | **54,920** | **13** | **1,249** | **15** | **923** | **119** | **192** |
+| **Total** | | **57,964** | **15** | **1,373** | **15** | **1,000** | **126** | **232** |
 
-1,042 of 1,234 real grid entries are located (84 %).
-After merging entries that name the same station in several grids, 591 of 753 stations are located (78 %); 12 of 13 toll points are.
+1,126 of 1,358 real grid entries are located (83 %).
+After merging entries that name the same station in several grids, 658 of 860 stations are located (77 %); 14 of 15 toll points are.
 
 ## Not located
 
@@ -50,3 +53,5 @@ through them will not detect them.
 - **ATMB (A40, A41 nord, B41)** (7): Chatillon, Cluses-Est, Cluses-Ouest, Findrol, Genève, Le Fayet, Scientrier
 - **Cofiroute (VINCI Autoroutes)** (15): ANGERS (CORZE), BARRIERE DE MONTREUIL AUX LIONS, BEAULIEU, CRIMOLOIS, DRUYE (CANDE), GONDREVILLE LA FRANCHE NORD, GONDREVILLE LA FRANCHE SUD, LE BIGNON, LES EPRUNES, ORMES, PARIS (LA FOLIE BESSIN), REIMS - TAISSY, ROUMOIS, TOURS CENTRE (MONNAIE), VITRE (LA GRAVELLE)
 - **Escota (VINCI Autoroutes)** (10): Aix (A51), Aix (A57, A50, A52, A8), Beausoleil/ Monaco Est, Cannet-de-Meyreuil, Gémenos, La Bédoule, La Cadière, Six-Fours-Les Plages, St-Cyr-Les Lecques, Toulon-ouest
+- **Sanef** (24): AMIENS EST (péage de Jules Verne), AMIENS SUD (péage de Dury), ARRAS EST (A1), ARRAS NORD (A26), BOULOGNE EST (péage d'Herquelingue), CALAIS (péage de Setques), CAMBRAI, FREYMING-MERLEBACH (A320), HORDAIN (péage d'Hordain), L'ISLE-ADAM (péage d'Amblainville), LILLE / DOURGES (péage de Fresnes), MARQUION, MEAUX (A140) / CRECY, METZ (A31), NEUFCHÂTEL-EN-BRAY (A28), PARIS / NOISY-LE-GRAND (péage de Coutevroult), PARIS / ROISSY (péage de Chamant), PÉRONNE / VALLEE DE LA SOMME, REIMS (péage de Courcy), REIMS EST (péage de Taissy), REIMS NORD (péage d'Ormes), REIMS OUEST (péage de Thillois), STRASBOURG, SURVILLIERS / SAINT-WITZ
+- **SAPN** (16): BEAUTOT / A151, BONNIÈRES-SUR-SEINE (A13a), CAEN, CAGNY (A813), CHAUFOUR N°15 à GAILLON N°17, CHENARD N°1 (A29), CRIQUEBEUF N°20 à MAISON-BRÛLEE N°24 / ROUEN LES ESSARTS (A139), INCARVILLE N°19 / A154, LA RIVIÈRE-SAINT-SAUVEUR N°3 (A29), LE HAVRE N°5 / A131, PLATEAU N°2 (A29), POISSY / ORGEVAL N°7 à MANTES-SUD N°12, PONT L'EVÊQUE, DEAUVILLE (A132), ST-SAËNS N°10 / A28, TANCARVILLE (A131), YVETOT / A150

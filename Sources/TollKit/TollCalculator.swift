@@ -142,7 +142,12 @@ public struct TollCalculator: Sendable {
     }
 
     /// Price of a single ticket: enter at `entry`, leave at `exit`.
-    public func fare(from entry: TollStation, to exit: TollStation, vehicleClass: VehicleClass) throws -> TollQuote.Line {
+    ///
+    /// On the A1, Sanef varies some class 1 fares by period (normal, green,
+    /// red); pass `sanefA1Period` to get the exact price, otherwise those
+    /// trips come back as the green-to-red range.
+    public func fare(from entry: TollStation, to exit: TollStation, vehicleClass: VehicleClass,
+                     sanefA1Period: SanefA1Period? = nil) throws -> TollQuote.Line {
         let found = database.fares(from: entry, to: exit)
         guard let first = found.first else {
             throw TollError.noPublishedFare(entry: entry.name, exit: exit.name)
@@ -152,16 +157,27 @@ public struct TollCalculator: Sendable {
         guard found.allSatisfy({ $0.fare.price(for: vehicleClass) == price }) else {
             throw TollError.conflictingFares(entry: entry.name, exit: exit.name)
         }
+        var amount = Amount.exact(price)
+        if vehicleClass == .class1,
+           let levels = found.lazy.compactMap({ $0.network.class1Modulation(from: entry, to: exit) }).first {
+            if let period = sanefA1Period, let exact = levels[period] {
+                amount = .exact(exact)
+            } else {
+                amount = .range(min: levels.values.min()!, max: levels.values.max()!, needs: [.sanefA1Period])
+            }
+        }
         return TollQuote.Line(kind: .ticket(entry: first.fare.entry, exit: first.fare.exit),
                               networkID: first.network.id, distanceMeters: first.fare.distanceMeters,
-                              amount: .exact(price))
+                              amount: amount)
     }
 
     /// One ticket between two named stations.
-    public func quote(from entry: String, to exit: String, vehicle: Vehicle) throws -> TollQuote {
+    public func quote(from entry: String, to exit: String, vehicle: Vehicle,
+                      sanefA1Period: SanefA1Period? = nil) throws -> TollQuote {
         guard let e = database.station(named: entry) else { throw TollError.unknownStation(entry) }
         guard let x = database.station(named: exit) else { throw TollError.unknownStation(exit) }
-        return TollQuote(vehicle: vehicle, lines: [try fare(from: e, to: x, vehicleClass: vehicle.vehicleClass)])
+        return TollQuote(vehicle: vehicle, lines: [try fare(from: e, to: x, vehicleClass: vehicle.vehicleClass,
+                                                            sanefA1Period: sanefA1Period)])
     }
 
     public func quote(from entry: String, to exit: String, vehicleClass: VehicleClass) throws -> TollQuote {
@@ -183,11 +199,12 @@ public struct TollCalculator: Sendable {
     /// longer ticket). Stretches no grid prices are reported as unavailable,
     /// never estimated. `date` is the time of the trip, used by seasonal and
     /// time-of-day prices; without it those come back as ranges.
-    public func quote(stops: [TollStop], vehicle: Vehicle, date: Date? = nil) -> TollQuote {
+    public func quote(stops: [TollStop], vehicle: Vehicle, date: Date? = nil,
+                      sanefA1Period: SanefA1Period? = nil) -> TollQuote {
         var lines: [TollQuote.Line] = []
         var run: [TollStation] = []
         func flush() {
-            lines += tickets(for: run, vehicleClass: vehicle.vehicleClass)
+            lines += tickets(for: run, vehicleClass: vehicle.vehicleClass, sanefA1Period: sanefA1Period)
             run = []
         }
         for stop in stops {
@@ -221,10 +238,13 @@ public struct TollCalculator: Sendable {
     /// start or end at any of its names.
     static let sameStationRadius = 1_000.0
 
-    private func fare(from entries: [TollStation], to exits: [TollStation], vehicleClass: VehicleClass) -> TollQuote.Line? {
+    private func fare(from entries: [TollStation], to exits: [TollStation], vehicleClass: VehicleClass,
+                      sanefA1Period: SanefA1Period?) -> TollQuote.Line? {
         for entry in entries {
             for exit in exits {
-                if let line = try? fare(from: entry, to: exit, vehicleClass: vehicleClass) { return line }
+                if let line = try? fare(from: entry, to: exit, vehicleClass: vehicleClass, sanefA1Period: sanefA1Period) {
+                    return line
+                }
             }
         }
         return nil
@@ -244,7 +264,8 @@ public struct TollCalculator: Sendable {
     }
 
     /// Fewest consecutive published tickets covering `stations`.
-    private func tickets(for stations: [TollStation], vehicleClass: VehicleClass) -> [TollQuote.Line] {
+    private func tickets(for stations: [TollStation], vehicleClass: VehicleClass,
+                         sanefA1Period: SanefA1Period?) -> [TollQuote.Line] {
         let path = group(stations)
         guard path.count >= 2 else { return [] }
         // Shortest path over a DAG: node i = "a ticket ends at path[i]". A
@@ -259,7 +280,7 @@ public struct TollCalculator: Sendable {
             for j in (i + 1)..<n {
                 let line: TollQuote.Line
                 let cost: Int
-                if let priced = fare(from: path[i], to: path[j], vehicleClass: vehicleClass) {
+                if let priced = fare(from: path[i], to: path[j], vehicleClass: vehicleClass, sanefA1Period: sanefA1Period) {
                     line = priced
                     cost = 1
                 } else if j == i + 1 {
@@ -309,16 +330,21 @@ public struct TollItinerary: Sendable, Hashable {
     public var vehicle: Vehicle
     /// Time of the trip (local French time is derived from it).
     public var date: Date?
+    /// Sanef A1 tariff level, when known (see `SanefA1Period`).
+    public var sanefA1Period: SanefA1Period?
 
-    public init(stops: [TollStop] = [], vehicle: Vehicle = Vehicle(.class1), date: Date? = nil) {
+    public init(stops: [TollStop] = [], vehicle: Vehicle = Vehicle(.class1), date: Date? = nil,
+                sanefA1Period: SanefA1Period? = nil) {
         self.stops = stops
         self.vehicle = vehicle
         self.date = date
+        self.sanefA1Period = sanefA1Period
     }
 }
 
 extension TollCalculator {
     public func quote(_ itinerary: TollItinerary) -> TollQuote {
-        quote(stops: itinerary.stops, vehicle: itinerary.vehicle, date: itinerary.date)
+        quote(stops: itinerary.stops, vehicle: itinerary.vehicle, date: itinerary.date,
+              sanefA1Period: itinerary.sanefA1Period)
     }
 }

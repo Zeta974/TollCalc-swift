@@ -185,6 +185,33 @@ def check_points():
     return ok
 
 
+def check_sanef():
+    """Sanef/SAPN grids are read from table cells; here each class page's plain
+    text must contain exactly the parsed prices (the A14 box values aside)."""
+    import re
+    import sanef
+    ok = True
+    for net_id, file_name in [("sanef", "2026_02-Grille-Sanef.pdf"), ("sapn", "2026_02-Grille-SAPN.pdf")]:
+        doc = json.loads((NETWORKS / f"{net_id}.json").read_text())
+        pairs = {frozenset((f[0], f[1])): f[3:8] for f in doc["fares"]}
+        network_ok = True
+        with pdfplumber.open(RAW / "sanef" / file_name) as pdf:
+            for k in range(1, 6):
+                text = pdf.pages[k].extract_text()
+                text = re.sub(r"PEAGE DE MONTESSON TARIF DE BASE \S+|TARIF REDUIT \S+|PEAGE DE CHAMBOURCY \S+", "", text)
+                printed = Counter(sanef.cents(v) for v in re.findall(r"(?<![\d,.])\d+,\d{1,2}(?![\d,])", text))
+                expected = Counter(v[k - 1] for v in pairs.values())
+                if printed != expected:
+                    network_ok = False
+                    print(f"  {net_id} class {k}: differs {list(((printed - expected) + (expected - printed)).items())[:8]}")
+        ok &= network_ok
+        print(f"{net_id}: {len(pairs)} trips x 5 classes vs page text -> {'OK' if network_ok else 'MISMATCH'}")
+    # A1 modulation: every "normal" level equals the grid (checked at build time); count them here
+    doc = json.loads((NETWORKS / "sanef.json").read_text())
+    print(f"sanef A1 modulation: {len(doc['class1Modulations'])} trips, normal level = regular fare (checked at build)")
+    return ok
+
+
 def check_a355():
     import points
     slots = points.verify_a355_against_vinci()
@@ -201,5 +228,6 @@ results = [
     check_journal_officiel(),
     check_a355(),
     check_points(),
+    check_sanef(),
 ]
 sys.exit(0 if all(results) else 1)

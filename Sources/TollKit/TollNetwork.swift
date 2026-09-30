@@ -65,6 +65,8 @@ public struct TollNetwork: Identifiable, Sendable {
 
     private let fareTable: [Pair: Row]
     private let stationsByKey: [String: Int]
+    /// Class 1 fares that vary with Sanef's A1 tariff period.
+    private let class1Modulations: [Pair: [SanefA1Period: Money]]
 
     struct Pair: Hashable {
         let entry: Int32
@@ -81,6 +83,12 @@ public struct TollNetwork: Identifiable, Sendable {
     /// Station of this grid matching a name, using the normalised key.
     public func station(named name: String) -> TollStation? {
         stationsByKey[StationName.key(name)].map { stations[$0] }
+    }
+
+    /// Class 1 prices by Sanef A1 period for this trip, if it is modulated.
+    public func class1Modulation(from entry: TollStation, to exit: TollStation) -> [SanefA1Period: Money]? {
+        guard let e = stationsByKey[entry.key], let x = stationsByKey[exit.key] else { return nil }
+        return class1Modulations[Pair(entry: Int32(e), exit: Int32(x))]
     }
 
     public func fare(from entry: TollStation, to exit: TollStation) -> Fare? {
@@ -102,7 +110,7 @@ public struct TollNetwork: Identifiable, Sendable {
 
 extension TollNetwork: Decodable {
     private enum CodingKeys: String, CodingKey {
-        case id, name, validFrom, source, stations, fares, points
+        case id, name, validFrom, source, stations, fares, points, class1Modulations
     }
 
     private struct RawPoint: Decodable {
@@ -168,6 +176,18 @@ extension TollNetwork: Decodable {
                 Row(distanceMeters: row[2] >= 0 ? row[2] : nil, prices: row[3...7].map { Money(cents: $0) })
         }
         fareTable = table
+
+        // [entry, exit, normal, green, red]
+        var modulations: [Pair: [SanefA1Period: Money]] = [:]
+        for row in try c.decodeIfPresent([[Int]].self, forKey: .class1Modulations) ?? [] {
+            guard row.count == 5, stations.indices.contains(row[0]), stations.indices.contains(row[1]) else {
+                throw DecodingError.dataCorruptedError(forKey: .class1Modulations, in: c,
+                    debugDescription: "Malformed modulation row \(row) in \(networkID)")
+            }
+            modulations[Pair(entry: Int32(row[0]), exit: Int32(row[1]))] =
+                [.normal: Money(cents: row[2]), .green: Money(cents: row[3]), .red: Money(cents: row[4])]
+        }
+        class1Modulations = modulations
 
         points = try (c.decodeIfPresent([RawPoint].self, forKey: .points) ?? []).map { raw in
             TollPoint(id: raw.id, name: raw.name, kind: raw.kind, networkID: networkID,

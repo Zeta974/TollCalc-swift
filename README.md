@@ -44,12 +44,13 @@ The main types:
 | Type | Role |
 |---|---|
 | `Vehicle` | Class 1–5, plus optional Euro class, axles, gross weight (PTAC), natural gas |
+| `SanefA1Period` | Normal / green / red level on the A1, when you know it |
 | `TollStop` | `.station` (a stop of a closed-system grid) or `.point` (barrier, bridge, tunnel) |
 | `Amount` | `.exact`, `.range(min, max, needs:)`, `.unavailable(reason)` |
 | `TollQuote` | Ordered lines, plus `total`, `totalRange`, `isExact`, `isComplete` and `missingInputs` |
 | `RouteTollDetector` | Polyline → ordered passages |
 
-`swift test` runs the suite (27 tests; Linux or macOS).
+`swift test` runs the suite (31 tests; Linux or macOS).
 
 ## Coverage
 
@@ -72,6 +73,8 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 | ADELAC | A41 Saint-Julien–Villy-le-Pelloux | Journal officiel* | 6 |
 | A'LIÉNOR | A65 Langon–Pau | Journal officiel* | 82 |
 | ALICORNE | A88 Falaise–Sées | Journal officiel* | 26 |
+| Sanef | A1, A2, A4, A16, A26, A29 | Sanef 2026 grid | 2,734 |
+| SAPN | A13, A29 (incl. A13 free-flow sections) | SAPN 2026 grid | 310 |
 
 \* Arrêté du 28 janvier 2026 (JO du 30 janvier 2026, NOR TRAT2534086A).
 
@@ -88,12 +91,15 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 | Maurice-Lemaire tunnel | Flat | APRR |
 | Puymorens tunnel | Flat | Légifrance (see below) |
 | Normandie and Tancarville bridges (from 1 May 2026) | Classes 1–4 | CCI Seine Estuaire |
+| A14 Montesson | Base / reduced rate by weekday and hour, public holidays | SAPN grid |
+| A14 Chambourcy | Flat | SAPN grid |
+
+**A1 time modulation (Sanef):** 122 class 1 trips towards Paris (to Compiègne ouest, Pont-Sainte-Maxence, Senlis and the Chamant barrier) have three official levels: normal, green (vert) and red (rouge). Sanef decides when the green and red periods apply, and that calendar is not in the data. So these trips come back as a green-to-red range unless you pass `sanefA1Period:`.
 
 ### Not covered yet
 
 | What | Why |
 |---|---|
-| **Sanef / SAPN** (A1, A2, A4, A13, A14, A16, A26, A29…, incl. A13/A14 free-flow) | Their site answers downloads from this build environment with a bot check, and I won't bypass it. Download `2026_02-Grille-Sanef.pdf`, `2026_02-Grille-SAPN.pdf` and `grille-modulee-01022026.pdf` from https://www.autoroutes.sanef.com/en/toll-rate-grids-sanef-sapn into `Tools/raw/sanef/`; an importer can then be written. |
 | A79 free-flow gantries | The Journal officiel and ALIAE's leaflet publish different gantries and prices. The Deux-Chaises barrier *is* covered. |
 | Duplex A86 (VINCI) | Priced by entry, direction, half-hour, day type (incl. eves of public holidays and August working days) and payment method. Needs its own model; the PDF is in `Tools/raw/other/`. |
 | Prado-Carénage / Prado-Sud tunnels (Marseille) | The operator's page loads its prices with JavaScript. |
@@ -110,6 +116,7 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 - **A355:** VINCI's per-station leaflet (half-hour slots × 4 day types × every class and Euro group, 1,760 cells) matches the Journal officiel's time bands minute by minute.
 - **Millau:** the Journal officiel matches the viaduct's own leaflet.
 - **Mont-Blanc and Fréjus:** the France-side prices, from two different operators' pages, are identical.
+- **Sanef / SAPN:** parsed from the table cells; each class page's plain text must contain exactly the same prices. Each column of the A1 time grid is matched to the only Sanef station whose regular fares equal its "normal" prices, and all 122 matched.
 - **Across operators:** wherever two grids price the same trip (APRR↔ASF, APRR↔Cofiroute, ASF↔Cofiroute, ALIS↔ASF, ARCOUR↔Cofiroute, A'LIÉNOR↔ASF, A79↔APRR/Cofiroute: about 5,600 trips), they agree to the cent. A unit test checks every shared pair.
 - **VINCI's own summary:** VINCI's "principales liaisons" table and the guides' worked examples match on all classes.
 
@@ -122,6 +129,8 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 - **A355 holidays:** public holidays are billed like Sundays ("dimanches et jours fériés"), using the order's list, which includes Good Friday and 26 December.
 - **A63 truck classes:** class 3 vehicles are class A up to 12 t PTAC, B above. Class 4 is B with 3 axles, C above.
 - **Undeclared Euro class:** a heavy vehicle without one pays the "non modulé" price where one is published. Where none is, the Euro class is required.
+- **A14 Montesson:** the reduced rate applies "du lundi au vendredi hors jours fériés de 10h à 16h et de 21h à 6h". It is not stated whether the 21h–6h window runs on after Friday night or starts on Sunday night, so on Saturday and Monday 00:00–05:59 the quote is the range between the two rates.
+- **A1 time grid:** its "normal" prices equal the regular grid, so it is read as trips towards Paris (northern entry, southern exit). The reverse direction uses the regular fare.
 - **Puymorens:** Légifrance also refuses this environment. The five prices were transcribed from its text; classes 1–4 match a second source, class 5 (4,60 €) has only that one.
 
 ## Route detection
@@ -129,7 +138,7 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 - **Positions come from OpenStreetMap:** toll booths (`barrier=toll_booth`) or, for stations with no mapped booth, the exit nodes of their interchange on both carriageways (`highway=motorway_junction`). They are matched by name, by road plus exit number, or by exit number near the rest of the grid, and reviewed pins cover the small networks.
 - **Tolerances:** a booth counts when the route passes within 35 m of it, an interchange within 80 m.
 - **One place, several names:** the same interchange named differently in two grids ("AMBERIEU" / "Ambérieu-en-Bugey") is treated as one stop.
-- **Coverage:** 84% of grid entries and 12 of 13 toll points are located; `COVERAGE.md` lists the rest.
+- **Coverage:** 83% of grid entries and 14 of 15 toll points are located; `COVERAGE.md` lists the rest. The A13/A14 free-flow sections are only partly mapped.
 - **Not yet tested on real routes.** Detection has only been checked on synthetic polylines. Use itineraries by station name when the detector misses something.
 
 ## Project layout
@@ -148,7 +157,8 @@ Sources/TollKit/
 Tools/
   build_tariffs.py               PDFs → JSON, OSM positions
   vinci_charts.py                reader for ASF/Escota chart PDFs
-  points.py                      toll points (JO annexes, tunnels, bridges)
+  points.py                      toll points (JO annexes, tunnels, bridges, A14)
+  sanef.py                       Sanef / SAPN grids and the A1 time grid
   verify_tariffs.py              the checks above
   coverage.py                    writes COVERAGE.md
   raw/                           official source documents
@@ -168,5 +178,5 @@ swift test
 
 ## Licences
 
-- **Tariffs:** published by the operators (APRR, AREA, ALIAE, VINCI Autoroutes, ATMB, SFTRF, CEVM, ALIS, ARCOUR, ADELAC, A'LIÉNOR, ALICORNE, ATLANDES, ALBEA, ARCOS, CCI Seine Estuaire) and in the Journal officiel.
+- **Tariffs:** published by the operators (APRR, AREA, ALIAE, VINCI Autoroutes, Sanef, SAPN, ATMB, SFTRF, CEVM, ALIS, ARCOUR, ADELAC, A'LIÉNOR, ALICORNE, ATLANDES, ALBEA, ARCOS, CCI Seine Estuaire) and in the Journal officiel.
 - **Positions:** © OpenStreetMap contributors, [ODbL 1.0](https://opendatacommons.org/licenses/odbl/). Any product showing or redistributing them must credit OpenStreetMap, and the ODbL's share-alike terms apply to derived databases.

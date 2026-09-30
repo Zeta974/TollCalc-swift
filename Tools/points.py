@@ -345,6 +345,42 @@ def ponts_seine():
     return out
 
 
+
+def a14():
+    """SAPN A14: Montesson (base / reduced rate by time) and Chambourcy.
+    'Le tarif réduit est applicable du lundi au vendredi hors jours fériés de
+    10h à 16h et de 21h à 6h.' Whether the 21h–6h window runs past Friday
+    night and starts on Sunday night is not stated, so on Saturday and Monday
+    00:00–05:59 both bands match and the quote is the range of the two."""
+    with pdfplumber.open(RAW / "sanef" / "2026_02-Grille-SAPN.pdf") as pdf:
+        texts = [pdf.pages[k].extract_text() for k in range(1, 6)]
+    base, reduced, chambourcy = {}, {}, {}
+    for k, text in enumerate(texts, start=1):
+        base[str(k)] = cents(re.search(r"PEAGE DE MONTESSON TARIF DE BASE (\d+,\d{2})", text).group(1))
+        reduced[str(k)] = cents(re.search(r"TARIF REDUIT (\d+,\d{2})", text).group(1))
+        chambourcy[str(k)] = cents(re.search(r"PEAGE DE CHAMBOURCY (\d+,\d{2})", text).group(1))
+    weekdays = ["mon", "tue", "wed", "thu", "fri"]
+    bands = {
+        "reduit": [[weekdays, "10:00", "15:59"], [weekdays, "21:00", "23:59"],
+                   [["tue", "wed", "thu", "fri"], "00:00", "05:59"],
+                   [["mon", "sat"], "00:00", "05:59"]],  # ambiguous windows
+        "base": [[weekdays, "06:00", "09:59"], [weekdays, "16:00", "20:59"],
+                 [["sat", "sun"], "00:00", "23:59"],
+                 [["mon"], "00:00", "05:59"]],  # ambiguous window (Saturday is covered above)
+    }
+    national_holidays = ["01-01", "easter+1", "05-01", "05-08", "easter+39", "easter+50",
+                         "07-14", "08-15", "11-01", "11-11", "12-25"]
+    return [
+        {"name": "Péage de Montesson", "kind": "barrier",
+         "booths": [[48.9142945, 2.1510977], [48.9142182, 2.1510852]],  # OSM toll gantries, A14
+         "tariff": {"heavyScheme": "standard", "bands": bands, "holidays": national_holidays, "holidaysAs": "sun",
+                    "periods": [{"when": {"band": "base"}, "prices": base},
+                                {"when": {"band": "reduit"}, "prices": reduced}]}},
+        {"name": "Péage de Chambourcy", "kind": "barrier",
+         "booths": [[48.9102342, 2.048088], [48.9118061, 2.0467239]],  # OSM toll gantries, A14
+         "tariff": {"heavyScheme": "standard", "periods": [{"when": None, "prices": chambourcy}]}},
+    ]
+
 POINT_NETWORKS = {
     "cevm": ("CEVM (Viaduc de Millau)", millau),
     "atlandes": ("ATLANDES (A63 Salles – Saint-Geours-de-Maremne)", atlandes),
@@ -355,6 +391,7 @@ POINT_NETWORKS = {
     "tml": ("Tunnel Maurice-Lemaire (APRR)", maurice_lemaire),
     "puymorens": ("Tunnel du Puymorens (ASF)", puymorens),
     "ponts-seine": ("Ponts de Normandie et de Tancarville (CCI Seine Estuaire)", ponts_seine),
+    "sapn-a14": ("SAPN (A14 Montesson, Chambourcy)", a14),
 }
 
 POINT_SOURCES = {
@@ -367,6 +404,7 @@ POINT_SOURCES = {
     "tml": ("2026-02-01", "https://voyage.aprr.fr/sites/default/files/2026-02/TARIFS_TML.pdf"),
     "puymorens": ("2026-02-01", "https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000053417660"),
     "ponts-seine": ("2026-05-01", "https://www.pontsnormandietancarville.fr/tarifs-de-peage/"),
+    "sapn-a14": ("2026-02-01", "https://www.autoroutes.sanef.com/sites/default/files/2026-01/2026_02-Grille-SAPN.pdf"),
 }
 
 

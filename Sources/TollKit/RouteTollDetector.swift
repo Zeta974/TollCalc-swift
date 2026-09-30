@@ -80,9 +80,9 @@ public struct RouteTollDetector: Sendable {
 
 extension TollCalculator {
     /// Price a route: detect what it goes through, then quote it.
-    public func quote(route: [GeoPoint], vehicle: Vehicle, date: Date? = nil,
+    public func quote(route: [GeoPoint], vehicle: Vehicle, date: Date? = nil, sanefA1Period: SanefA1Period? = nil,
                       detector: RouteTollDetector? = nil) -> (passages: [TollPassage], quote: TollQuote) {
         let passages = (detector ?? RouteTollDetector(database: database)).passages(along: route)
-        return (passages, quote(stops: passages.map(\.stop), vehicle: vehicle, date: date))
+        return (passages, quote(stops: passages.map(\.stop), vehicle: vehicle, date: date, sanefA1Period: sanefA1Period))
     }
 }
