@@ -6,3 +6,4 @@ DerivedData/
 .venv/
 Tools/raw/*.txt
 .DS_Store
+__pycache__/
