@@ -243,6 +243,50 @@ def check_a355():
     return True
 
 
+# Same normalised name, different places: kept apart by TollDatabase.
+HOMONYMS = {"ST JULIEN"}  # ATMB Saint-Julien(-en-Genevois), SFTRF St Julien(-Mont-Denis)
+
+
+def check_positions():
+    """Station positions against the grids: the same name in two grids must be
+    one place, and no fare may join stations further apart (straight line)
+    than its tariff distance, or, without one, be under 2 cents a kilometre
+    over more than 15 km. Catches a station placed at the wrong exit."""
+    import math
+    from build_tariffs import app_key
+
+    def km(a, b):
+        return 6371 * math.hypot(math.radians(a[0] - b[0]), math.radians(a[1] - b[1]) * math.cos(math.radians(a[0])))
+
+    docs = {p.stem: json.loads(p.read_text()) for p in sorted(NETWORKS.glob("*.json"))}
+    problems, places = [], {}
+    for net, d in docs.items():
+        for s in d["stations"]:
+            if "lat" in s:
+                places.setdefault(app_key(s["name"]), []).append((net, s["name"], (s["lat"], s["lon"])))
+    for key, entries in places.items():
+        far = [(a, b) for i, a in enumerate(entries) for b in entries[i + 1:] if km(a[2], b[2]) > 3]
+        if far and key not in HOMONYMS:
+            problems += [f"{a[0]}:{a[1]} and {b[0]}:{b[1]} are {km(a[2], b[2]):.0f} km apart" for a, b in far]
+    checked = 0
+    for net, d in docs.items():
+        st = d["stations"]
+        for e, x, dist, c1, *_ in d["fares"]:
+            a, b = st[e], st[x]
+            if "lat" not in a or "lat" not in b:
+                continue
+            checked += 1
+            line = km((a["lat"], a["lon"]), (b["lat"], b["lon"]))
+            if dist > 0 and line > dist / 1000 * 1.1 + 3:
+                problems.append(f"{net}: {a['name']} -> {b['name']}: {line:.0f} km apart, tariff distance {dist / 1000:.0f} km")
+            elif dist < 0 and c1 > 0 and line > 15 and c1 / line < 2:
+                problems.append(f"{net}: {a['name']} -> {b['name']}: {c1 / 100:.2f} € for {line:.0f} km")
+    for p in problems[:20]:
+        print("   ", p)
+    print(f"positions: {checked} located fares and every shared name vs the grids -> {'OK' if not problems else 'MISMATCH'}")
+    return not problems
+
+
 results = [
     check("aprr", "TARIFS_APRR.pdf", named),
     check("area", "TARIFS_INTERNES_AREA.pdf", area),
@@ -253,5 +297,6 @@ results = [
     check_a355(),
     check_points(),
     check_sanef(),
+    check_positions(),
 ]
 sys.exit(0 if all(results) else 1)

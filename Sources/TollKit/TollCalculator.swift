@@ -264,16 +264,30 @@ public struct TollCalculator: Sendable {
     /// start or end at any of its names.
     static let sameStationRadius = 1_000.0
 
+    /// When names at the same place price the trip differently (one plaza
+    /// that is two grid entries, e.g. ASF "Péage de Toulouse nord/est" and
+    /// "nord/ouest"), the route alone cannot tell which applies: the line is
+    /// the range of those fares and asks for `.station`.
     private func fare(from entries: [TollStation], to exits: [TollStation], vehicleClass: VehicleClass,
                       sanefA1Period: SanefA1Period?) -> TollQuote.Line? {
+        var lines: [TollQuote.Line] = []
         for entry in entries {
             for exit in exits {
                 if let line = try? fare(from: entry, to: exit, vehicleClass: vehicleClass, sanefA1Period: sanefA1Period) {
-                    return line
+                    lines.append(line)
                 }
             }
         }
-        return nil
+        guard let first = lines.first else { return nil }
+        let bounds = lines.compactMap(\.amount.bounds)
+        guard Set(lines.map(\.amount)).count > 1, bounds.count == lines.count,
+              let low = bounds.map(\.0).min(), let high = bounds.map(\.1).max() else { return first }
+        var needs: Set<TripInput> = [.station]
+        for line in lines {
+            if case .range(_, _, let more) = line.amount { needs.formUnion(more) }
+        }
+        return TollQuote.Line(kind: first.kind, networkID: first.networkID, distanceMeters: nil,
+                              amount: .range(min: low, max: high, needs: needs))
     }
 
     private func group(_ path: [TollStation]) -> [[TollStation]] {

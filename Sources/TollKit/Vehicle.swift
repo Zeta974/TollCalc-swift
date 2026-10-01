@@ -72,6 +72,10 @@ public enum TripInput: String, Hashable, Sendable, Codable, CaseIterable {
     /// Which Sanef A1 tariff level applies (normal, green or red). Sanef sets
     /// the green and red periods; the calendar is not part of the bundled data.
     case sanefA1Period
+    /// Which of several grid entries sharing one place the trip uses (one
+    /// plaza priced as two stations, e.g. the Toulouse nord/est and nord/ouest
+    /// barriers). Name the stations in the itinerary to get one price.
+    case station
 }
 
 /// A subscription with its own per-passage price. Only per-passage prices are

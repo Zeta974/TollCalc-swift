@@ -22,6 +22,7 @@ from pathlib import Path
 import pdfplumber
 
 import points as point_tolls
+from pins import PINS
 import sanef
 import vinci_charts
 
@@ -130,7 +131,8 @@ def dist_m(s: str) -> int:
 
 
 def norm(name: str, strip_peage: bool = True) -> str:
-    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().upper()
+    # "’" would be dropped by the ASCII step, gluing "d’Arles" into "DARLES"
+    s = unicodedata.normalize("NFKD", name.replace("’", "'")).encode("ascii", "ignore").decode().upper()
     if strip_peage:
         s = re.sub(r"\bPEAGE (DE |DU |DES |D'|D’)?", "", s)
     s = re.sub(r"(\bS)?/\s*", " SUR ", s)  # 'BELLEVILLE S/SAONE', 'FONTENAY /LOING'
@@ -499,7 +501,7 @@ def locate(stations, osm, operators, match_codes=False):
 
 def app_key(name: str) -> str:
     """Same normalisation as StationName.key in TollKit."""
-    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().upper()
+    s = unicodedata.normalize("NFKD", name.replace("’", "'")).encode("ascii", "ignore").decode().upper()
     s = re.sub(r"(\bS)?/\s*", " SUR ", s)
     s = re.sub(r"\bCH\.", "CHATEAU ", s)
     s = s.replace("SAINTE", "STE").replace("SAINT", "ST")
@@ -537,54 +539,47 @@ def _ref_key(ref):
     return re.sub(r"[\s.\-]+", ".", ref.strip().lower())
 
 
-# Stations placed by hand, checked against exit numbers, positions and the
-# order of stations along the road. Values are OSM junction node ids ("n…")
-# from Tools/data/osm_motorway_junctions.json, or booth names from
-# Tools/data/osm_toll_booths.json ("booth:…"), or an explicit [lat, lon].
-MANUAL_PINS = {
-    "atmb": {
-        "Saint-Julien": ["n11264369966"],  # A40 exit 13 Saint-Julien-en-Genevois
-        "Etrembières - Annemasse": ["n1110757713", "n7043179811"],  # A40 exit 14 Annemasse
-        "Origine": [[45.900965, 6.860764]],  # Mont-Blanc tunnel toll plaza (French side)
-    },
-    "sftrf": {  # A43 exits in Maurienne
-        "St Pierre": ["n2188188165", "n612573928"],  # exit 25 Saint-Pierre-de-Belleville
-        "Ste Marie": ["n21032841", "n60294409"],  # exit 26 Sainte-Marie-de-Cuines
-        "St Jean": ["n2185654628"],  # exit 27 Saint-Jean-de-Maurienne
-        "St Julien": ["n267165935"],  # exit 28 Saint-Julien-Mont-Denis
-        "Modane": ["n1139898026", "n279888636"],  # exit 30 Modane
-    },
-    "alis": {
-        "Alençon": ["booth:Alençon Nord"],
-        "Broglie": ["booth:Broglie-Orbec"],
-        "A13": ["n248867577"],  # A28/A13 junction
-    },
-    "arcour": {
-        "Savigny sur Claris": ["booth:Savigny-sur-Clairis"],
-        "Gondreville la Franche": ["n1808309613", "n457361469"],  # A19/A77 junction
-        "Piffonds": ["n456719874", "n97733462"],  # A19/A6 junction near Courtenay
-        "Chevilly": ["n456737416"],  # A19/A10 junction near Artenay
-    },
-    "alienor": {
-        "Aire-sur-l'Adour centre": ["booth:Aire-sur-l'Adour Nord"],
-        "Langon (A62)": ["n648626013", "n648626111"],  # A62/A65 junction
-        "Pau (A64)": ["n1921056977"],  # A65/A64 junction
-    },
-    "alicorne": {  # A88 exits 11 to 15
-        "Falaise Ouest": ["n712698030", "n27784198"],
-        "Falaise sud": ["n987821573"],
-        "Argentan sud": ["n270426632"],
-        "Mortrée": ["n1014077869", "n229546977"],
-    },
-}
+def _resolve_pin(net_id, name, ref, junctions, booths, booth_ids):
+    """One pin reference -> (points, kind)."""
+    if isinstance(ref, list):
+        return [ref], "junctions"
+    if ref.startswith("booth:"):
+        found = booths.get(ref[6:], [])
+        if not found:
+            sys.exit(f"{net_id}: no OSM booth named {ref[6:]!r}")
+        return [[e["lat"], e["lon"]] for e in found], "booths"
+    if ref.startswith("exit:"):
+        # "exit:A10:44" -> the interchange with that number on that road; it must
+        # be unique, or "exit:A10:44@lat,lon" picks the one nearest that point
+        spec, _, near = ref[5:].partition("@")
+        road, _, number = spec.partition(":")
+        nodes = [j for j in junctions.values()
+                 if road in [r.replace(" ", "") for r in j.get("roads") or []]
+                 and j.get("ref") and _ref_key(j["ref"]) == _ref_key(number)]
+        groups = _clusters(nodes)
+        if near:
+            here = tuple(map(float, near.split(",")))
+            groups = sorted(groups, key=lambda g: min(_km(here, (n["lat"], n["lon"])) for n in g))[:1]
+            if groups and min(_km(here, (n["lat"], n["lon"])) for n in groups[0]) > 15:
+                sys.exit(f"{net_id}: {name}: {ref} is more than 15 km from the hint")
+        if len(groups) != 1:
+            sys.exit(f"{net_id}: {name}: {ref} matches {len(groups)} interchanges")
+        return [[n["lat"], n["lon"]] for n in groups[0]], "junctions"
+    if ref in booth_ids and ref not in junctions:
+        return [[booth_ids[ref]["lat"], booth_ids[ref]["lon"]]], "booths"
+    if ref not in junctions:
+        sys.exit(f"{net_id}: {name}: unknown OSM node {ref}")
+    return [[junctions[ref]["lat"], junctions[ref]["lon"]]], "junctions"
 
 
 def apply_pins(net_id, stations, osm):
-    pins = MANUAL_PINS.get(net_id, {})
+    """Hand-checked positions (Tools/pins.py). They override the automatic
+    ones. "same:" pins are applied once every grid is built (apply_same_as)."""
+    pins = PINS.get(net_id, {})
     if not pins:
         return
     junctions = {j["osm"]: j for j in json.loads(JUNCTIONS.read_text())["elements"]}
-    booths = {}
+    booths, booth_ids = {}, {e["osm"]: e for e in osm}
     for e in osm:
         if e.get("name"):
             booths.setdefault(e["name"], []).append(e)
@@ -593,21 +588,46 @@ def apply_pins(net_id, stations, osm):
         s = by_name.get(name)
         if s is None:
             sys.exit(f"{net_id}: pinned station {name!r} is not in the grid")
+        for k in ("lat", "lon", "booths", "junctions", "virtual"):
+            s.pop(k, None)
+        if refs == "virtual" or (isinstance(refs, tuple) and refs[0] == "virtual"):
+            s["virtual"] = True
+            continue
+        if isinstance(refs, str) and refs.startswith("same:"):
+            continue
         points, kind = [], "junctions"
         for ref in refs:
-            if isinstance(ref, list):
-                points.append(ref)
-            elif ref.startswith("booth:"):
-                found = booths.get(ref[6:], [])
-                if not found:
-                    sys.exit(f"{net_id}: no OSM booth named {ref[6:]!r}")
-                points += [[e["lat"], e["lon"]] for e in found]
-                kind = "booths"
-            else:
-                points.append([junctions[ref]["lat"], junctions[ref]["lon"]])
+            found, k = _resolve_pin(net_id, name, ref, junctions, booths, booth_ids)
+            points += found
+            kind = "booths" if k == "booths" else kind
         s[kind] = points
         s["lat"] = round(sum(p[0] for p in points) / len(points), 6)
         s["lon"] = round(sum(p[1] for p in points) / len(points), 6)
+        s["pinned"] = True
+
+
+def apply_same_as(net_ids):
+    """Copy positions for "same:<grid>:<name>" pins: a station another grid
+    names differently (e.g. APRR "REIMS EST (TAISSY)" = Sanef "REIMS EST
+    (péage de Taissy)")."""
+    docs = {p.stem: json.loads(p.read_text()) for p in OUT.glob("*.json")}
+    for net_id in net_ids:
+        changed = False
+        for name, refs in PINS.get(net_id, {}).items():
+            if not (isinstance(refs, str) and refs.startswith("same:")):
+                continue
+            src_net, _, src_name = refs[5:].partition(":")
+            src = next((s for s in docs[src_net]["stations"] if s["name"] == src_name), None)
+            if src is None or "lat" not in src:
+                sys.exit(f"{net_id}: {name}: {refs} is not a located station")
+            s = next(s for s in docs[net_id]["stations"] if s["name"] == name)
+            for k in ("lat", "lon", "booths", "junctions"):
+                s.pop(k, None)
+                if k in src:
+                    s[k] = src[k]
+            changed = True
+        if changed:
+            (OUT / f"{net_id}.json").write_text(json.dumps(docs[net_id], ensure_ascii=False, separators=(",", ":")))
 
 
 def locate_junctions(net_id, stations):
@@ -801,7 +821,8 @@ def main():
         **{net_id: (lambda pages=pages: parse_jo_triangle(pages))
            for annex, (net_id, _, pages) in JO_TRIANGLES.items() if net_id != "sftrf"},
     }
-    for net_id in sys.argv[1:] or [*parsers, *point_tolls.POINT_NETWORKS]:
+    net_ids = sys.argv[1:] or [*parsers, *point_tolls.POINT_NETWORKS]
+    for net_id in net_ids:
         if net_id in point_tolls.POINT_NETWORKS:
             build_points(net_id, osm)
         elif net_id == "sanef":
@@ -809,6 +830,7 @@ def main():
             build(net_id, SOURCES[net_id], rows, osm, sanef.parse_a1_modulation(rows))
         else:
             build(net_id, SOURCES[net_id], parsers[net_id](), osm)
+    apply_same_as([n for n in net_ids if n in parsers])
 
 
 if __name__ == "__main__":

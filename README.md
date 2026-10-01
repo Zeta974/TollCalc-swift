@@ -54,7 +54,7 @@ The main types:
 
 ## Coverage
 
-Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail and every station that is not on the map yet.
+Coverage below is as of 1 October 2026. Every station and toll point a route can go through has a position; `COVERAGE.md` has the per-grid detail.
 
 ### Closed-system grids (entry → exit tickets, 5 classes)
 
@@ -142,10 +142,13 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 
 ## Route detection
 
-- **Positions come from OpenStreetMap:** toll booths (`barrier=toll_booth`) or, for stations with no mapped booth, the exit nodes of their interchange on both carriageways (`highway=motorway_junction`). They are matched by name, by road plus exit number, or by exit number near the rest of the grid, and reviewed pins cover the small networks.
+- **Positions come from OpenStreetMap:** toll booths (`barrier=toll_booth`) or, for stations with no mapped booth, the exit nodes of their interchange on both carriageways (`highway=motorway_junction`). They are matched by name, by road plus exit number, or by exit number near the rest of the grid.
+- **Hand-checked positions (`Tools/pins.py`):** 247 grid entries the matching cannot place: names printed differently from OSM, ASF exits listed without their motorway, barriers named after a place, and stations another grid already places under another name ("same:"). Each was checked against the grid itself: the order of stations in the ASF charts, the cheapest neighbouring trips, and whether a booth is on the main line or on a ramp. Pins also fixed three wrong automatic positions: Cofiroute "ANGERS" (the guide prints it with the other station's exit number, so it had been placed at Ancenis), Cofiroute "CHALONS - LA VEUVE" (55 km off), and the A355 Ittenheim side station (OSM gives the barrier's name to its ramp booths).
+- **Checked against the grids:** `verify_tariffs.py` fails if a fare joins two stations further apart in a straight line than its tariff distance, or costs under 2 cents a kilometre over more than 15 km, or if one name sits in two places.
 - **Tolerances:** a booth counts when the route passes within 35 m of it, an interchange within 80 m.
-- **One place, several names:** the same interchange named differently in two grids ("AMBERIEU" / "Ambérieu-en-Bugey") is treated as one stop.
-- **Coverage:** 83% of grid entries and 14 of 15 toll points are located; `COVERAGE.md` lists the rest. The A13/A14 free-flow sections are only partly mapped.
+- **One place, several names:** the same station named differently in two grids ("AMBERIEU" / "Ambérieu-en-Bugey") is one stop. When names at one place price a trip differently (the A62 plaza north of Toulouse is both "Péage de Toulouse nord/est" and "nord/ouest" in the ASF grid), the route cannot tell which applies: the quote is the range and asks for `.station`; naming the station gives the exact price.
+- **Same name, different places:** ATMB "Saint-Julien" (en-Genevois) and SFTRF "St Julien" (Mont-Denis) normalise to the same key; entries more than 5 km apart are kept as separate stations.
+- **Not on a route:** the open-system marker, concession limits (e.g. ATMB "Chatillon", between Sylans and Bellegarde), borders (ATMB "Genève") and APRR "LUSSE" (the Maurice-Lemaire tunnel, priced by its own toll point) are priced when named but never detected.
 - **Not yet tested on real routes.** Detection has only been checked on synthetic polylines. Use itineraries by station name when the detector misses something.
 
 ## Project layout
@@ -167,6 +170,7 @@ Tools/
   points.py                      toll points (JO annexes, tunnels, bridges, A14)
   sanef.py                       Sanef / SAPN grids and the A1 time grid
   verify_tariffs.py              the checks above
+  pins.py                        hand-checked station positions
   coverage.py                    writes COVERAGE.md
   raw/                           official source documents
   data/                          OpenStreetMap snapshots (toll booths, motorway exits)

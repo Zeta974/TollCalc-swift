@@ -19,9 +19,15 @@ public struct TollDatabase: Sendable {
     public init(networks: [TollNetwork]) {
         self.networks = networks
         var merged: [String: TollStation] = [:]
+        // Same name, different places (ATMB "Saint-Julien" en-Genevois and SFTRF
+        // "St Julien" Mont-Denis): kept apart.
+        var homonyms: [TollStation] = []
         for network in networks {
             for station in network.stations {
-                if let existing = merged[station.key] {
+                if let existing = merged[station.key], let a = existing.location, let b = station.location,
+                   Geo.distance(a, b) > Self.homonymDistance {
+                    homonyms.append(station)
+                } else if let existing = merged[station.key] {
                     let booths = existing.booths + station.booths.filter { !existing.booths.contains($0) }
                     let junctions = existing.junctions + station.junctions.filter { !existing.junctions.contains($0) }
                     // Prefer a booth position over an interchange position.
@@ -37,7 +43,7 @@ public struct TollDatabase: Sendable {
             }
         }
         stationsByKey = merged
-        stations = merged.values.sorted { $0.name < $1.name }
+        stations = (Array(merged.values) + homonyms).sorted { $0.name < $1.name }
         points = networks.flatMap(\.points).sorted { $0.name < $1.name }
         pointsByKey = Dictionary(points.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
         var combined: [[String]: TollPoint] = [:]
@@ -54,6 +60,10 @@ public struct TollDatabase: Sendable {
     public func combined(_ a: TollPoint, _ b: TollPoint) -> TollPoint? {
         combinedPoints[[a.id, b.id]]
     }
+
+    /// Entries of different grids with the same name are one station unless
+    /// they are further apart than this.
+    static let homonymDistance = 5_000.0
 
     /// Loads the grids bundled with TollKit (`Resources/networks/*.json`).
     public static func bundled() throws -> TollDatabase {

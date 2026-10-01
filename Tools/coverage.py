@@ -11,7 +11,7 @@ def app_key(name):
     """Same normalisation as StationName.key in TollKit (and build_tariffs.app_key)."""
     import re
     import unicodedata
-    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().upper()
+    s = unicodedata.normalize("NFKD", name.replace("’", "'")).encode("ascii", "ignore").decode().upper()
     s = re.sub(r"(\bS)?/\s*", " SUR ", s)
     s = re.sub(r"\bCH\.", "CHATEAU ", s)
     s = s.replace("SAINTE", "STE").replace("SAINT", "ST")
@@ -29,7 +29,9 @@ def main():
         "(OpenStreetMap `barrier=toll_booth`) or, failing that, by the exit nodes of its",
         "interchange (`highway=motorway_junction`). *Virtual* entries are not places you",
         "can enter or leave (concession limits, motorway forks, the open-system marker,",
-        "borders); they are priced but never detected on a route.",
+        "borders); they are priced but never detected on a route. *Combined* toll points",
+        "(A79 transits, Duplex A86 trips, both Prado tunnels) have no position of their",
+        "own: the route detector finds the points they combine.",
         "",
         "| Grid | Valid from | Fares | Toll points | Stations | Virtual | By booth | By interchange | Not located |",
         "|---|---|---:|---:|---:|---:|---:|---:|---:|",
@@ -50,7 +52,7 @@ def main():
         lines.append(f"| {d['name']} | {d['validFrom']} | " + " | ".join(f"{v:,}" for v in row) + " |")
         if unlocated:
             missing[d["name"]] = sorted(s["name"] for s in unlocated)
-        unlocated_points = [p["name"] for p in pts if "lat" not in p]
+        unlocated_points = [p["name"] for p in pts if "lat" not in p and not p.get("combines")]
         if unlocated_points:
             missing.setdefault(d["name"], []).extend(f"{n} (toll point)" for n in unlocated_points)
     lines.append("| **Total** | | " + " | ".join(f"**{v:,}**" for v in totals) + " |")
@@ -68,7 +70,9 @@ def main():
               f"After merging entries that name the same station in several grids, "
               f"{sum(merged.values()):,} of {len(merged):,} stations are located "
               f"({100 * sum(merged.values()) / len(merged):.0f} %); "
-              f"{sum('lat' in p for d in docs for p in d.get('points', []))} of {totals[1]} toll points are.", ""]
+              f"{sum('lat' in p for d in docs for p in d.get('points', []))} of "
+              f"{sum(not p.get('combines') for d in docs for p in d.get('points', []))} toll points are "
+              f"(plus {sum(bool(p.get('combines')) for d in docs for p in d.get('points', []))} combined).", ""]
     for name in list(missing):
         missing[name] = [n for n in missing[name] if n.endswith("(toll point)") or not merged.get(app_key(n))]
         if not missing[name]:
@@ -78,6 +82,8 @@ def main():
               "through them will not detect them.", ""]
     for name, stations in missing.items():
         lines.append(f"- **{name}** ({len(stations)}): " + ", ".join(stations))
+    if not missing:
+        lines.append("None: every station and toll point a route can go through has a position.")
     (ROOT / "COVERAGE.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines[10:10 + len(docs) + 4]))
 

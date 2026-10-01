@@ -238,9 +238,14 @@ def arcos():
     if nord != centre:
         sys.exit("A355: Nord and Centre sections differ; the side station needs a direction")
     return [
-        {"name": "Barrière d'Ittenheim", "kind": "barrier", "osm": ["Barrière de péage d'Ittenheim"],
+        # OSM names all four booths "Barrière de péage d'Ittenheim": two are on the
+        # A355 main line (the barrier), two on the ramps (the side station).
+        {"name": "Barrière d'Ittenheim", "kind": "barrier",
+         "booths": [[48.5994931, 7.6211721], [48.5997693, 7.6206487]],  # n6838799409, n6838799446
          "tariff": tariff(barrier)},
-        {"name": "Gare latérale d'Ittenheim", "kind": "barrier", "tariff": tariff(nord)},
+        {"name": "Gare latérale d'Ittenheim", "kind": "barrier",
+         "booths": [[48.6004291, 7.6176433], [48.600345, 7.6179173]],  # n6576722978, n6838794070
+         "tariff": tariff(nord)},
     ], sections
 
 
