@@ -87,6 +87,8 @@ public struct PointTariff: Hashable, Sendable {
         }
 
         let condition: Condition?
+        /// Subscriptions this price is reserved to; `nil` for the public price.
+        let subscriptions: Set<TollSubscription>?
         /// Class key ("1"…"5", or "A"/"B"/"C") -> price cell.
         let prices: [String: PriceCell]
     }
@@ -178,12 +180,16 @@ public struct PointTariff: Hashable, Sendable {
     func amount(for vehicle: Vehicle, at date: Date?) -> Amount {
         var needs = Set<TripInput>()
 
+        // A subscriber pays the subscription price where one exists, else the public one.
+        let subscribed = self.periods.filter { !($0.subscriptions ?? []).isDisjoint(with: vehicle.subscriptions) }
+        let offered = subscribed.isEmpty ? self.periods.filter { $0.subscriptions == nil } : subscribed
+
         let periods: [Period]
         if let date {
-            periods = self.periods.filter { $0.condition.map { matches($0, date) } ?? true }
+            periods = offered.filter { $0.condition.map { matches($0, date) } ?? true }
             if periods.isEmpty { return .unavailable("No published price at this date") }
         } else {
-            periods = self.periods
+            periods = offered
         }
 
         let classKeys: [String]
@@ -302,6 +308,7 @@ extension PointTariff: Decodable {
             let band: String?
         }
         let when: When?
+        let subscriptions: [String]?
         let prices: [String: RawCell]
     }
 
@@ -373,7 +380,16 @@ extension PointTariff: Decodable {
                 case .modulated(let d): return .modulated(d.mapValues { Money(cents: $0) })
                 }
             }
-            return Period(condition: condition, prices: prices)
+            let subscriptions = try raw.subscriptions.map { names in
+                Set(try names.map { name in
+                    guard let subscription = TollSubscription(rawValue: name) else {
+                        throw DecodingError.dataCorruptedError(forKey: .periods, in: c,
+                                                               debugDescription: "Unknown subscription \(name)")
+                    }
+                    return subscription
+                })
+            }
+            return Period(condition: condition, subscriptions: subscriptions, prices: prices)
         }
     }
 

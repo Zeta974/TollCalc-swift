@@ -18,7 +18,9 @@ final class TollKitTests: XCTestCase {
         XCTAssertEqual(byID["escota"]?.fareCount, 2_260)
         XCTAssertEqual(byID["asf"]?.validFrom, "2026-06-01")  // ASF revised its grid on 1 June 2026
         // Alpine tunnels change on 1 January, the Seine bridges changed on 1 May 2026.
-        let exceptions = ["asf": "2026-06-01", "tmb": "2026-01-01", "frejus": "2026-01-01", "ponts-seine": "2026-05-01"]
+        // The Prado tunnels' page gives no start date: it is the day it was read.
+        let exceptions = ["asf": "2026-06-01", "tmb": "2026-01-01", "frejus": "2026-01-01", "ponts-seine": "2026-05-01",
+                          "prado": "2026-10-01"]
         for network in database.networks {
             XCTAssertEqual(network.validFrom, exceptions[network.id] ?? "2026-02-01", network.id)
         }

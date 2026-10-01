@@ -29,6 +29,7 @@ borders); they are priced but never detected on a route.
 | Escota (VINCI Autoroutes) | 2026-02-01 | 2,260 | 0 | 54 | 0 | 32 | 12 | 10 |
 | Tunnel du Fréjus (SFTRF) | 2026-01-01 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
 | Ponts de Normandie et de Tancarville (CCI Seine Estuaire) | 2026-05-01 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
+| Tunnels Prado Carénage et Prado Sud (SMTPC) | 2026-10-01 | 0 | 3 | 0 | 0 | 0 | 0 | 0 |
 | Tunnel du Puymorens (ASF) | 2026-02-01 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
 | Sanef | 2026-02-01 | 2,734 | 0 | 96 | 0 | 67 | 5 | 24 |
 | SAPN (A14 Montesson, Chambourcy) | 2026-02-01 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
@@ -36,10 +37,10 @@ borders); they are priced but never detected on a route.
 | SFTRF (A43 Maurienne) | 2026-02-01 | 30 | 0 | 7 | 0 | 2 | 5 | 0 |
 | Tunnel du Mont-Blanc (ATMB / GEIE-TMB) | 2026-01-01 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
 | Tunnel Maurice-Lemaire (APRR) | 2026-02-01 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **Total** | | **57,964** | **24** | **1,373** | **15** | **1,000** | **126** | **232** |
+| **Total** | | **57,964** | **27** | **1,373** | **15** | **1,000** | **126** | **232** |
 
 1,126 of 1,358 real grid entries are located (83 %).
-After merging entries that name the same station in several grids, 658 of 860 stations are located (77 %); 20 of 24 toll points are.
+After merging entries that name the same station in several grids, 658 of 860 stations are located (77 %); 22 of 27 toll points are.
 
 ## Not located
 
@@ -55,5 +56,6 @@ through them will not detect them.
 - **ATMB (A40, A41 nord, B41)** (7): Chatillon, Cluses-Est, Cluses-Ouest, Findrol, Genève, Le Fayet, Scientrier
 - **Cofiroute (VINCI Autoroutes)** (15): ANGERS (CORZE), BARRIERE DE MONTREUIL AUX LIONS, BEAULIEU, CRIMOLOIS, DRUYE (CANDE), GONDREVILLE LA FRANCHE NORD, GONDREVILLE LA FRANCHE SUD, LE BIGNON, LES EPRUNES, ORMES, PARIS (LA FOLIE BESSIN), REIMS - TAISSY, ROUMOIS, TOURS CENTRE (MONNAIE), VITRE (LA GRAVELLE)
 - **Escota (VINCI Autoroutes)** (10): Aix (A51), Aix (A57, A50, A52, A8), Beausoleil/ Monaco Est, Cannet-de-Meyreuil, Gémenos, La Bédoule, La Cadière, Six-Fours-Les Plages, St-Cyr-Les Lecques, Toulon-ouest
+- **Tunnels Prado Carénage et Prado Sud (SMTPC)** (1): Tunnels Prado Carénage + Sud (toll point)
 - **Sanef** (24): AMIENS EST (péage de Jules Verne), AMIENS SUD (péage de Dury), ARRAS EST (A1), ARRAS NORD (A26), BOULOGNE EST (péage d'Herquelingue), CALAIS (péage de Setques), CAMBRAI, FREYMING-MERLEBACH (A320), HORDAIN (péage d'Hordain), L'ISLE-ADAM (péage d'Amblainville), LILLE / DOURGES (péage de Fresnes), MARQUION, MEAUX (A140) / CRECY, METZ (A31), NEUFCHÂTEL-EN-BRAY (A28), PARIS / NOISY-LE-GRAND (péage de Coutevroult), PARIS / ROISSY (péage de Chamant), PÉRONNE / VALLEE DE LA SOMME, REIMS (péage de Courcy), REIMS EST (péage de Taissy), REIMS NORD (péage d'Ormes), REIMS OUEST (péage de Thillois), STRASBOURG, SURVILLIERS / SAINT-WITZ
 - **SAPN** (16): BEAUTOT / A151, BONNIÈRES-SUR-SEINE (A13a), CAEN, CAGNY (A813), CHAUFOUR N°15 à GAILLON N°17, CHENARD N°1 (A29), CRIQUEBEUF N°20 à MAISON-BRÛLEE N°24 / ROUEN LES ESSARTS (A139), INCARVILLE N°19 / A154, LA RIVIÈRE-SAINT-SAUVEUR N°3 (A29), LE HAVRE N°5 / A131, PLATEAU N°2 (A29), POISSY / ORGEVAL N°7 à MANTES-SUD N°12, PONT L'EVÊQUE, DEAUVILLE (A132), ST-SAËNS N°10 / A28, TANCARVILLE (A131), YVETOT / A150

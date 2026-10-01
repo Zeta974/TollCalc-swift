@@ -426,6 +426,38 @@ def a79():
     return out
 
 
+
+def prado():
+    """Tunnels Prado (SMTPC), price page as captured on 1 October 2026
+    (raw/other/tunnels-prado-tarifs.png). The page prints one price per tunnel
+    with no vehicle class, so only class 1 is priced. Subscribers ("Tunnel
+    Pass", "Tunnel Pass+") pay a day (7h-20h) or night (20h-7h) price. Taking
+    both tunnels in a row has its own price, which is not the sum of the two."""
+    passes = ["prado-tunnel-pass", "prado-tunnel-pass-plus"]
+    bands = {"day": [[list(DAYS), "07:00", "19:59"]],
+             "night": [[list(DAYS), "20:00", "23:59"], [list(DAYS), "00:00", "06:59"]]}
+    carenage = [[43.282431, 5.393765], [43.282722, 5.393321], [43.280883, 5.395869], [43.280864, 5.395758]]
+    sud = [[43.281408, 5.394905], [43.281447, 5.395009]]  # OSM toll booths on each tunnel's ways
+    out = []
+    for name, public, day, night, booths, combines in [
+        ("Tunnel Prado Carénage", 330, 300, 270, carenage, None),
+        ("Tunnel Prado Sud", 290, 270, 250, sud, None),
+        ("Tunnels Prado Carénage + Sud", 620, 580, 540, None,
+         ["prado:Tunnel Prado Carénage", "prado:Tunnel Prado Sud"]),
+    ]:
+        point = {"name": name, "kind": "tunnel",
+                 "tariff": {"heavyScheme": "standard", "bands": bands, "periods": [
+                     {"when": None, "prices": {"1": public}},
+                     {"when": {"band": "day"}, "subscriptions": passes, "prices": {"1": day}},
+                     {"when": {"band": "night"}, "subscriptions": passes, "prices": {"1": night}}]}}
+        if booths:
+            point["booths"] = booths
+        if combines:
+            point["combines"] = combines
+        out.append(point)
+    return out
+
+
 POINT_NETWORKS = {
     "cevm": ("CEVM (Viaduc de Millau)", millau),
     "atlandes": ("ATLANDES (A63 Salles – Saint-Geours-de-Maremne)", atlandes),
@@ -438,6 +470,7 @@ POINT_NETWORKS = {
     "ponts-seine": ("Ponts de Normandie et de Tancarville (CCI Seine Estuaire)", ponts_seine),
     "sapn-a14": ("SAPN (A14 Montesson, Chambourcy)", a14),
     "aliae-a79": ("ALIAE (A79 flux libre)", a79),
+    "prado": ("Tunnels Prado Carénage et Prado Sud (SMTPC)", prado),
 }
 
 POINT_SOURCES = {
@@ -452,6 +485,7 @@ POINT_SOURCES = {
     "ponts-seine": ("2026-05-01", "https://www.pontsnormandietancarville.fr/tarifs-de-peage/"),
     "sapn-a14": ("2026-02-01", "https://www.autoroutes.sanef.com/sites/default/files/2026-01/2026_02-Grille-SAPN.pdf"),
     "aliae-a79": ("2026-02-01", "https://www.aliae.com/files/live/sites/aliae/files/Documents/TARIFS_ALIAE-2026.pdf"),
+    "prado": ("2026-10-01", "https://www.tunnelsprado.com/"),
 }
 
 

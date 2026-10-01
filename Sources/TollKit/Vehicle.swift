@@ -20,19 +20,24 @@ public struct Vehicle: Hashable, Sendable, Codable {
     /// Crit'Air 0 or fully electric. The A79 free-flow section has a lower
     /// price for these in classes 1, 2 and 5.
     public var isVeryLowEmission: Bool
+    /// Subscriptions held for this vehicle. Where one has its own price, the
+    /// quote uses it instead of the public price.
+    public var subscriptions: Set<TollSubscription>
 
     public init(_ vehicleClass: VehicleClass, euroClass: EuroClass? = nil, axles: Int? = nil,
-                grossWeightTonnes: Double? = nil, usesNaturalGas: Bool = false, isVeryLowEmission: Bool = false) {
+                grossWeightTonnes: Double? = nil, usesNaturalGas: Bool = false, isVeryLowEmission: Bool = false,
+                subscriptions: Set<TollSubscription> = []) {
         self.vehicleClass = vehicleClass
         self.euroClass = euroClass
         self.axles = axles
         self.grossWeightTonnes = grossWeightTonnes
         self.usesNaturalGas = usesNaturalGas
         self.isVeryLowEmission = isVeryLowEmission
+        self.subscriptions = subscriptions
     }
 
     private enum CodingKeys: String, CodingKey {
-        case vehicleClass, euroClass, axles, grossWeightTonnes, usesNaturalGas, isVeryLowEmission
+        case vehicleClass, euroClass, axles, grossWeightTonnes, usesNaturalGas, isVeryLowEmission, subscriptions
     }
 
     public init(from decoder: Decoder) throws {
@@ -42,7 +47,8 @@ public struct Vehicle: Hashable, Sendable, Codable {
                   axles: try c.decodeIfPresent(Int.self, forKey: .axles),
                   grossWeightTonnes: try c.decodeIfPresent(Double.self, forKey: .grossWeightTonnes),
                   usesNaturalGas: try c.decodeIfPresent(Bool.self, forKey: .usesNaturalGas) ?? false,
-                  isVeryLowEmission: try c.decodeIfPresent(Bool.self, forKey: .isVeryLowEmission) ?? false)
+                  isVeryLowEmission: try c.decodeIfPresent(Bool.self, forKey: .isVeryLowEmission) ?? false,
+                  subscriptions: try c.decodeIfPresent(Set<TollSubscription>.self, forKey: .subscriptions) ?? [])
     }
 }
 
@@ -66,6 +72,16 @@ public enum TripInput: String, Hashable, Sendable, Codable, CaseIterable {
     /// Which Sanef A1 tariff level applies (normal, green or red). Sanef sets
     /// the green and red periods; the calendar is not part of the bundled data.
     case sanefA1Period
+}
+
+/// A subscription with its own per-passage price. Only per-passage prices are
+/// modelled; deposits and monthly fees are not part of a quote.
+public enum TollSubscription: String, CaseIterable, Codable, Sendable {
+    /// Tunnels Prado (Marseille) "Tunnel Pass" badge.
+    case pradoTunnelPass = "prado-tunnel-pass"
+    /// Tunnels Prado "Tunnel Pass+" badge (Ulys, also valid on motorways,
+    /// where it pays the public price).
+    case pradoTunnelPassPlus = "prado-tunnel-pass-plus"
 }
 
 /// Class 1 tariff levels Sanef applies on the A1 towards Paris
