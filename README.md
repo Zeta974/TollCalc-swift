@@ -93,6 +93,7 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 | Normandie and Tancarville bridges (from 1 May 2026) | Classes 1–4 | CCI Seine Estuaire |
 | A14 Montesson | Base / reduced rate by weekday and hour, public holidays | SAPN grid |
 | A14 Chambourcy | Flat | SAPN grid |
+| A79 free-flow gantries (Le Montet, Montbeugny, Molinet) | Per gantry or "transit" through both gantries of an interchange; very low emission cars (Crit'Air 0 / electric); trucks by Euro class | ALIAE leaflet |
 
 **A1 time modulation (Sanef):** 122 class 1 trips towards Paris (to Compiègne ouest, Pont-Sainte-Maxence, Senlis and the Chamant barrier) have three official levels: normal, green (vert) and red (rouge). Sanef decides when the green and red periods apply, and that calendar is not in the data. So these trips come back as a green-to-red range unless you pass `sanefA1Period:`.
 
@@ -100,7 +101,6 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 
 | What | Why |
 |---|---|
-| A79 free-flow gantries | The Journal officiel and ALIAE's leaflet publish different gantries and prices. The Deux-Chaises barrier *is* covered. |
 | Duplex A86 (VINCI) | Priced by entry, direction, half-hour, day type (incl. eves of public holidays and August working days) and payment method. Needs its own model; the PDF is in `Tools/raw/other/`. |
 | Prado-Carénage / Prado-Sud tunnels (Marseille) | The operator's page loads its prices with JavaScript. |
 | Subscriptions, discounts, return tickets | Only the public one-way price is modelled. |
@@ -117,6 +117,7 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 - **Millau:** the Journal officiel matches the viaduct's own leaflet.
 - **Mont-Blanc and Fréjus:** the France-side prices, from two different operators' pages, are identical.
 - **Sanef / SAPN:** parsed from the table cells; each class page's plain text must contain exactly the same prices. Each column of the A1 time grid is matched to the only Sanef station whose regular fares equal its "normal" prices, and all 122 matched.
+- **A79 gantries:** the leaflet's table is an image, so it is transcribed. The Journal officiel prints the same table as text: 7 of its 9 gantries match on all 14 prices. The first two differ (the JO lists an extra "Deux-Chaises / Ouest" gantry and a 1,20 € Le Montet transit). Ulys bills the leaflet's figures (Montluçon → Mâcon, class 1: 3,30 + 1,00 + 1,90 + 1,30 = 7,50 €), so the leaflet is used. Unit tests also check trips of the leaflet's trip table.
 - **Across operators:** wherever two grids price the same trip (APRR↔ASF, APRR↔Cofiroute, ASF↔Cofiroute, ALIS↔ASF, ARCOUR↔Cofiroute, A'LIÉNOR↔ASF, A79↔APRR/Cofiroute: about 5,600 trips), they agree to the cent. A unit test checks every shared pair.
 - **VINCI's own summary:** VINCI's "principales liaisons" table and the guides' worked examples match on all classes.
 
@@ -130,6 +131,7 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 - **A63 truck classes:** class 3 vehicles are class A up to 12 t PTAC, B above. Class 4 is B with 3 axles, C above.
 - **Undeclared Euro class:** a heavy vehicle without one pays the "non modulé" price where one is published. Where none is, the Euro class is required.
 - **A14 Montesson:** the reduced rate applies "du lundi au vendredi hors jours fériés de 10h à 16h et de 21h à 6h". It is not stated whether the 21h–6h window runs on after Friday night or starts on Sunday night, so on Saturday and Monday 00:00–05:59 the quote is the range between the two rates.
+- **A79 transit:** passing both gantries of an interchange (Ouest then Est, or the reverse) is billed once at the "transit" price, as the leaflet's trip table and Ulys do. Trucks have no price for an undeclared Euro class there, so the quote asks for it.
 - **A1 time grid:** its "normal" prices equal the regular grid, so it is read as trips towards Paris (northern entry, southern exit). The reverse direction uses the regular fare.
 - **Puymorens:** Légifrance also refuses this environment. The five prices were transcribed from its text; classes 1–4 match a second source, class 5 (4,60 €) has only that one.
 

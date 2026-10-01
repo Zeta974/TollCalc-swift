@@ -768,6 +768,8 @@ def build_points(net_id, osm):
     for p in make():
         booths = p.get("booths") or [[e["lat"], e["lon"]] for n in p.get("osm", []) for e in by_name.get(n, [])]
         point = {"id": f"{net_id}:{p['name']}", "name": p["name"], "kind": p["kind"], "tariff": p["tariff"]}
+        if p.get("combines"):
+            point["combines"] = p["combines"]
         if booths:
             point["lat"] = round(sum(b[0] for b in booths) / len(booths), 6)
             point["lon"] = round(sum(b[1] for b in booths) / len(booths), 6)

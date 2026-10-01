@@ -13,6 +13,8 @@ public struct TollDatabase: Sendable {
     public let points: [TollPoint]
     private let stationsByKey: [String: TollStation]
     private let pointsByKey: [String: TollPoint]
+    /// Points that replace two consecutive points (`TollPoint.combines`).
+    private let combinedPoints: [Set<String>: TollPoint]
 
     public init(networks: [TollNetwork]) {
         self.networks = networks
@@ -38,6 +40,13 @@ public struct TollDatabase: Sendable {
         stations = merged.values.sorted { $0.name < $1.name }
         points = networks.flatMap(\.points).sorted { $0.name < $1.name }
         pointsByKey = Dictionary(points.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
+        combinedPoints = Dictionary(points.filter { $0.combines.count == 2 }.map { ($0.combines, $0) },
+                                    uniquingKeysWith: { first, _ in first })
+    }
+
+    /// The point billed instead of passing `a` then `b` (or `b` then `a`), if any.
+    public func combined(_ a: TollPoint, _ b: TollPoint) -> TollPoint? {
+        combinedPoints[[a.id, b.id]]
     }
 
     /// Loads the grids bundled with TollKit (`Resources/networks/*.json`).

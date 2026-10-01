@@ -381,6 +381,51 @@ def a14():
          "tariff": {"heavyScheme": "standard", "periods": [{"when": None, "prices": chambourcy}]}},
     ]
 
+
+# ALIAE leaflet 2026, page 2 ("Péage en flux libre"). The table is an image,
+# so it is transcribed: VL base (classes 1, 2, 5), very low emission VL (Crit'Air
+# 0 / électrique), then classes 3 and 4 for Euro 0-3 (noir), 4 (rouge), 5 (bleu)
+# and 6+ (vert). "Transit" is the price of passing both gantries of an
+# interchange without leaving. The JO annex XII prints the same seven rows
+# from "Le Montet Est" on (checked in verify_tariffs.py) but differs on the
+# first gantry pair; an Ulys estimate (Montluçon -> Mâcon, class 1: Le Montet
+# transit 1,00 €) matches the leaflet.
+A79_GANTRIES = [
+    ("Le Montet Ouest",    "0,20 0,30 0,10  0,10 0,20 0,10  0,40 1,10 0,50 1,10 0,40 1,00 0,40 1,00"),
+    ("Le Montet Transit",  "1,00 1,60 0,60  0,70 1,30 0,40  3,10 4,80 3,10 4,70 3,00 4,40 2,70 4,30"),
+    ("Le Montet Est",      "1,10 1,70 0,60  0,80 1,30 0,40  2,80 4,40 2,80 4,30 2,70 4,10 2,50 4,00"),
+    ("Montbeugny Ouest",   "1,10 1,70 0,60  0,80 1,30 0,40  3,20 4,70 3,10 4,60 3,00 4,40 2,80 4,20"),
+    ("Montbeugny Transit", "1,90 2,80 1,00  1,50 2,20 0,80  6,20 9,60 6,10 9,40 5,80 9,10 5,40 8,80"),
+    ("Montbeugny Est",     "1,00 1,60 0,50  0,80 1,20 0,40  3,20 5,80 3,10 5,70 3,00 5,50 2,80 5,30"),
+    ("Molinet Ouest",      "1,20 1,70 0,50  0,90 1,30 0,40  3,40 4,80 3,30 4,70 3,20 4,50 3,00 4,40"),
+    ("Molinet Transit",    "1,30 2,00 0,80  1,00 1,60 0,60  4,20 6,00 4,10 5,90 3,90 5,70 3,60 5,50"),
+    ("Molinet Est",        "0,40 0,70 0,20  0,30 0,50 0,20  1,20 1,90 1,20 1,90 1,10 1,80 1,10 1,80"),
+]
+
+
+def a79_rows():
+    """{gantry: [14 prices in cents]} in the leaflet's column order."""
+    return {name: [cents(v) for v in values.split()] for name, values in A79_GANTRIES}
+
+
+def a79():
+    out = []
+    for name, v in a79_rows().items():
+        heavy = lambda c3: {**{f"euro{k}": v[6 + c3] for k in range(4)}, "euro4": v[8 + c3],
+                            "euro5": v[10 + c3], "euro6": v[12 + c3], "euro7": v[12 + c3]}
+        prices = {"1": {"default": v[0], "vtfe": v[3]}, "2": {"default": v[1], "vtfe": v[4]},
+                  "5": {"default": v[2], "vtfe": v[5]}, "3": heavy(0), "4": heavy(1)}
+        point = {"name": f"A79 {name}", "kind": "gantry",
+                 "tariff": {"heavyScheme": "standard", "periods": [{"when": None, "prices": prices}]}}
+        if name.endswith("Transit"):
+            site = name.removesuffix(" Transit")
+            point["combines"] = [f"aliae-a79:A79 {site} Ouest", f"aliae-a79:A79 {site} Est"]
+        else:
+            point["osm"] = [name]  # OSM toll gantries, one per carriageway
+        out.append(point)
+    return out
+
+
 POINT_NETWORKS = {
     "cevm": ("CEVM (Viaduc de Millau)", millau),
     "atlandes": ("ATLANDES (A63 Salles – Saint-Geours-de-Maremne)", atlandes),
@@ -392,6 +437,7 @@ POINT_NETWORKS = {
     "puymorens": ("Tunnel du Puymorens (ASF)", puymorens),
     "ponts-seine": ("Ponts de Normandie et de Tancarville (CCI Seine Estuaire)", ponts_seine),
     "sapn-a14": ("SAPN (A14 Montesson, Chambourcy)", a14),
+    "aliae-a79": ("ALIAE (A79 flux libre)", a79),
 }
 
 POINT_SOURCES = {
@@ -405,6 +451,7 @@ POINT_SOURCES = {
     "puymorens": ("2026-02-01", "https://www.legifrance.gouv.fr/jorf/id/JORFTEXT000053417660"),
     "ponts-seine": ("2026-05-01", "https://www.pontsnormandietancarville.fr/tarifs-de-peage/"),
     "sapn-a14": ("2026-02-01", "https://www.autoroutes.sanef.com/sites/default/files/2026-01/2026_02-Grille-SAPN.pdf"),
+    "aliae-a79": ("2026-02-01", "https://www.aliae.com/files/live/sites/aliae/files/Documents/TARIFS_ALIAE-2026.pdf"),
 }
 
 

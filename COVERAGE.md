@@ -12,6 +12,7 @@ borders); they are priced but never detected on a route.
 |---|---|---:|---:|---:|---:|---:|---:|---:|
 | ADELAC (A41 Saint-Julien–Villy-le-Pelloux) | 2026-02-01 | 6 | 0 | 4 | 0 | 1 | 1 | 2 |
 | ALBEA (A150 Écalles-Alix – Barentin) | 2026-02-01 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
+| ALIAE (A79 flux libre) | 2026-02-01 | 0 | 9 | 0 | 0 | 0 | 0 | 0 |
 | ALIAE (A79) - barrière de Deux-Chaises | 2026-02-01 | 324 | 0 | 163 | 2 | 143 | 1 | 17 |
 | ALICORNE (A88 Falaise–Sées) | 2026-02-01 | 26 | 0 | 7 | 0 | 2 | 5 | 0 |
 | A'LIÉNOR (A65 Langon–Pau) | 2026-02-01 | 82 | 0 | 10 | 0 | 8 | 2 | 0 |
@@ -35,10 +36,10 @@ borders); they are priced but never detected on a route.
 | SFTRF (A43 Maurienne) | 2026-02-01 | 30 | 0 | 7 | 0 | 2 | 5 | 0 |
 | Tunnel du Mont-Blanc (ATMB / GEIE-TMB) | 2026-01-01 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
 | Tunnel Maurice-Lemaire (APRR) | 2026-02-01 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **Total** | | **57,964** | **15** | **1,373** | **15** | **1,000** | **126** | **232** |
+| **Total** | | **57,964** | **24** | **1,373** | **15** | **1,000** | **126** | **232** |
 
 1,126 of 1,358 real grid entries are located (83 %).
-After merging entries that name the same station in several grids, 658 of 860 stations are located (77 %); 14 of 15 toll points are.
+After merging entries that name the same station in several grids, 658 of 860 stations are located (77 %); 20 of 24 toll points are.
 
 ## Not located
 
@@ -46,6 +47,7 @@ These stations are priced exactly when named in an itinerary, but a route
 through them will not detect them.
 
 - **ADELAC (A41 Saint-Julien–Villy-le-Pelloux)** (2): BPV Villy-le-Pelloux, BSE Nord
+- **ALIAE (A79 flux libre)** (3): A79 Le Montet Transit (toll point), A79 Montbeugny Transit (toll point), A79 Molinet Transit (toll point)
 - **ALIAE (A79) - barrière de Deux-Chaises** (16): CHALONS MOURMELON, CHEMERY, GONDREVILLE A77/N, GONDREVILLE A77/S, LA FOLIE-B/PARIS, LES EPRUNES, MONTREUIL (REIMS), REIMS EST (TAISSY), REIMS NORD (ORMES), REIMS OUEST (THILLOIS), ST GERMAIN LES VERGNE, ST HILAIRE, ST ROMAIN SUR CHER, TOURS-C/MONNAIE, VILLE SOUS LAFERTE, VILLEFRANCHE S/ CHER
 - **APRR** (17): CHALONS MOURMELON, CHEMERY, GONDREVILLE A77/N, GONDREVILLE A77/S, LA FOLIE-B/PARIS, LES EPRUNES, LUSSE, MONTREUIL (REIMS), REIMS EST (TAISSY), REIMS NORD (ORMES), REIMS OUEST (THILLOIS), ST GERMAIN LES VERGNE, ST HILAIRE, ST ROMAIN SUR CHER, TOURS-C/MONNAIE, VILLE SOUS LAFERTE, VILLEFRANCHE S/ CHER
 - **ARCOS (A355 contournement ouest de Strasbourg)** (1): Gare latérale d'Ittenheim (toll point)

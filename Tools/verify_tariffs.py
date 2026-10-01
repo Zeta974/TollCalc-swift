@@ -182,7 +182,27 @@ def check_points():
     same = mb == fr
     ok &= same
     print(f"tunnels: Mont-Blanc (ATMB page) vs Fréjus (SFTRF leaflet), France side -> {'OK' if same else 'MISMATCH'}")
+    ok &= check_a79()
     return ok
+
+
+def check_a79():
+    """A79 gantries are transcribed from the ALIAE leaflet (an image). JO annex
+    XII prints them as text in the same column order; from "Le Montet Est" on,
+    every row must match. Its first rows (a "Deux-Chaises / Ouest" gantry, a
+    different Le Montet transit) disagree with the leaflet, which Ulys confirms."""
+    import re
+    import points
+    with pdfplumber.open(points.JO) as pdf:
+        text = next(p.extract_text() for p in pdf.pages if "ANNEXE XII" in (p.extract_text() or ""))
+    jo = {}
+    for name, side, values in re.findall(r"^([A-Z][\w-]+(?: [A-Z][\w-]+)?) / (Ouest|Transit|Est) ((?:\d+,\d{2} € ?)+)$", text, re.M):
+        jo.setdefault(f"{name} {side}", []).extend(points.cents(v) for v in re.findall(r"\d+,\d{2}", values))
+    leaflet = points.a79_rows()
+    agreeing = list(leaflet)[2:]
+    same = all(jo.get(k) == leaflet[k] for k in agreeing)
+    print(f"aliae-a79: leaflet transcription vs JO annex XII, {len(agreeing)} gantries x 14 prices -> {'OK' if same else 'MISMATCH'}")
+    return same
 
 
 def check_sanef():

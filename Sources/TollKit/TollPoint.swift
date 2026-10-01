@@ -14,6 +14,23 @@ public struct TollPoint: Identifiable, Hashable, Sendable {
     public let location: GeoPoint?
     public let booths: [GeoPoint]
     public let tariff: PointTariff
+    /// Ids of two points this one replaces when a trip passes them one after
+    /// the other, in either order: on the A79 free-flow section, driving
+    /// through both gantries of an interchange is billed once, at the
+    /// "transit" price, not as the sum of the two gantries.
+    public let combines: Set<String>
+
+    public init(id: String, name: String, kind: Kind, networkID: String, location: GeoPoint?,
+                booths: [GeoPoint], tariff: PointTariff, combines: Set<String> = []) {
+        self.id = id
+        self.name = name
+        self.kind = kind
+        self.networkID = networkID
+        self.location = location
+        self.booths = booths
+        self.tariff = tariff
+        self.combines = combines
+    }
 
     public var key: String { StationName.key(name) }
 
@@ -76,8 +93,48 @@ public struct PointTariff: Hashable, Sendable {
 
     enum PriceCell: Hashable, Sendable {
         case flat(Money)
-        /// Keys "default" (non modulé), "euro0"…"euro7", "gnv".
+        /// Keys "default" (non modulé), "euro0"…"euro7", "gnv", and "vtfe"
+        /// (very low emission: Crit'Air 0 / fully electric).
         case modulated([String: Money])
+
+        enum Missing: Error {
+            /// The cell has no "default" price and the Euro class is not
+            /// given: the price is one of these.
+            case euroClass([Money])
+            case price(String)
+
+            var key: String {
+                switch self {
+                case .euroClass: return "undeclared Euro class"
+                case .price(let key): return key
+                }
+            }
+        }
+
+        var allPrices: [Money] {
+            switch self {
+            case .flat(let m): return [m]
+            case .modulated(let d): return Array(Set(d.values))
+            }
+        }
+
+        /// The price this vehicle pays.
+        func prices(for vehicle: Vehicle) -> Result<[Money], Missing> {
+            guard case .modulated(let byKey) = self else { return .success(allPrices) }
+            if vehicle.usesNaturalGas, let m = byKey["gnv"] { return .success([m]) }
+            if vehicle.isVeryLowEmission, let m = byKey["vtfe"] { return .success([m]) }
+            let hasEuroKeys = byKey.keys.contains { $0.hasPrefix("euro") }
+            if let euro = vehicle.euroClass, hasEuroKeys {
+                return byKey[euro.key].map { .success([$0]) } ?? .failure(.price(euro.key))
+            }
+            if let m = byKey["default"] { return .success([m]) }
+            if hasEuroKeys {
+                // Every Euro class priced, none for an undeclared one.
+                let euros = Set(byKey.filter { $0.key.hasPrefix("euro") }.values)
+                return .failure(euros.count > 1 ? .euroClass(Array(euros)) : .price("default"))
+            }
+            return .failure(.price("default"))
+        }
     }
 
     struct ClosedMonthDayRange: Hashable, Sendable {
@@ -113,12 +170,7 @@ public struct PointTariff: Hashable, Sendable {
 
     /// Every published price of this tariff, for listing and validation.
     public var allPrices: [Money] {
-        periods.flatMap { $0.prices.values.flatMap { cell -> [Money] in
-            switch cell {
-            case .flat(let m): return [m]
-            case .modulated(let d): return Array(d.values)
-            }
-        } }
+        periods.flatMap { $0.prices.values.flatMap(\.allPrices) }
     }
 
     public var dependsOnDate: Bool { periods.contains { $0.condition != nil } }
@@ -156,30 +208,22 @@ public struct PointTariff: Hashable, Sendable {
         }
 
         var candidates: [Money] = []
-        var byKeyAcrossPeriods: [String: Set<Money>] = [:]
+        var byKeyAcrossPeriods: [String: Set<[Money]>] = [:]
         for period in periods {
             for key in classKeys {
                 guard let cell = period.prices[key] else {
                     return .unavailable("No published price for \(vehicle.vehicleClass.title)")
                 }
-                switch cell {
-                case .flat(let money):
-                    candidates.append(money)
-                case .modulated(let byKey):
-                    let priceKey: String
-                    if vehicle.usesNaturalGas, byKey["gnv"] != nil {
-                        priceKey = "gnv"
-                    } else if let euro = vehicle.euroClass {
-                        priceKey = euro.key
-                    } else {
-                        priceKey = "default"
-                    }
-                    guard let money = byKey[priceKey] else {
-                        return .unavailable("No published price for \(priceKey)")
-                    }
-                    candidates.append(money)
+                let prices: [Money]
+                switch cell.prices(for: vehicle) {
+                case .success(let found):
+                    prices = found
+                case .failure(let missing):
+                    if case .euroClass(let possible) = missing { needs.insert(.euroClass); prices = possible }
+                    else { return .unavailable("No published price for \(missing.key)") }
                 }
-                byKeyAcrossPeriods[key, default: []].insert(candidates[candidates.count - 1])
+                candidates += prices
+                byKeyAcrossPeriods[key, default: []].insert(prices.sorted())
             }
         }
         if date == nil, byKeyAcrossPeriods.values.contains(where: { $0.count > 1 }) {

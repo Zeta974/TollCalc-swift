@@ -17,14 +17,32 @@ public struct Vehicle: Hashable, Sendable, Codable {
     public var grossWeightTonnes: Double?
     /// Natural gas (GNV) trucks have their own price on the A63.
     public var usesNaturalGas: Bool
+    /// Crit'Air 0 or fully electric. The A79 free-flow section has a lower
+    /// price for these in classes 1, 2 and 5.
+    public var isVeryLowEmission: Bool
 
     public init(_ vehicleClass: VehicleClass, euroClass: EuroClass? = nil, axles: Int? = nil,
-                grossWeightTonnes: Double? = nil, usesNaturalGas: Bool = false) {
+                grossWeightTonnes: Double? = nil, usesNaturalGas: Bool = false, isVeryLowEmission: Bool = false) {
         self.vehicleClass = vehicleClass
         self.euroClass = euroClass
         self.axles = axles
         self.grossWeightTonnes = grossWeightTonnes
         self.usesNaturalGas = usesNaturalGas
+        self.isVeryLowEmission = isVeryLowEmission
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case vehicleClass, euroClass, axles, grossWeightTonnes, usesNaturalGas, isVeryLowEmission
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(try c.decode(VehicleClass.self, forKey: .vehicleClass),
+                  euroClass: try c.decodeIfPresent(EuroClass.self, forKey: .euroClass),
+                  axles: try c.decodeIfPresent(Int.self, forKey: .axles),
+                  grossWeightTonnes: try c.decodeIfPresent(Double.self, forKey: .grossWeightTonnes),
+                  usesNaturalGas: try c.decodeIfPresent(Bool.self, forKey: .usesNaturalGas) ?? false,
+                  isVeryLowEmission: try c.decodeIfPresent(Bool.self, forKey: .isVeryLowEmission) ?? false)
     }
 }
 
@@ -42,6 +60,9 @@ public enum TripInput: String, Hashable, Sendable, Codable, CaseIterable {
     case axles
     /// `Vehicle.grossWeightTonnes`
     case grossWeight
+    /// `Vehicle.euroClass`, where no price is published for an undeclared
+    /// class (A79 heavy vehicles).
+    case euroClass
     /// Which Sanef A1 tariff level applies (normal, green or red). Sanef sets
     /// the green and red periods; the calendar is not part of the bundled data.
     case sanefA1Period

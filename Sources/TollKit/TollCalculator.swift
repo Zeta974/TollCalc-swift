@@ -201,6 +201,7 @@ public struct TollCalculator: Sendable {
     /// time-of-day prices; without it those come back as ranges.
     public func quote(stops: [TollStop], vehicle: Vehicle, date: Date? = nil,
                       sanefA1Period: SanefA1Period? = nil) -> TollQuote {
+        let stops = mergingCombinedPoints(stops)
         var lines: [TollQuote.Line] = []
         var run: [TollStation] = []
         func flush() {
@@ -226,6 +227,23 @@ public struct TollCalculator: Sendable {
     }
 
     // MARK: - Internals
+
+    /// Replaces two consecutive points with the point that bills them together.
+    private func mergingCombinedPoints(_ stops: [TollStop]) -> [TollStop] {
+        var out: [TollStop] = []
+        var i = 0
+        while i < stops.count {
+            if let a = stops[i].point, i + 1 < stops.count, let b = stops[i + 1].point,
+               let both = database.combined(a, b) {
+                out.append(.point(both))
+                i += 2
+            } else {
+                out.append(stops[i])
+                i += 1
+            }
+        }
+        return out
+    }
 
     private func pointLine(_ point: TollPoint, vehicle: Vehicle, date: Date?) -> TollQuote.Line {
         TollQuote.Line(kind: .point(point), networkID: point.networkID, distanceMeters: nil,
