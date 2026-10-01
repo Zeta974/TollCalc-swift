@@ -26,6 +26,7 @@ borders); they are priced but never detected on a route.
 | ATMB (A40, A41 nord, B41) | 2026-02-01 | 262 | 0 | 17 | 0 | 4 | 6 | 7 |
 | CEVM (Viaduc de Millau) | 2026-02-01 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
 | Cofiroute (VINCI Autoroutes) | 2026-02-01 | 11,004 | 0 | 251 | 0 | 200 | 36 | 15 |
+| Duplex A86 (VINCI Autoroutes) | 2026-01-01 | 0 | 9 | 0 | 0 | 0 | 0 | 0 |
 | Escota (VINCI Autoroutes) | 2026-02-01 | 2,260 | 0 | 54 | 0 | 32 | 12 | 10 |
 | Tunnel du Fréjus (SFTRF) | 2026-01-01 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
 | Ponts de Normandie et de Tancarville (CCI Seine Estuaire) | 2026-05-01 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
@@ -37,10 +38,10 @@ borders); they are priced but never detected on a route.
 | SFTRF (A43 Maurienne) | 2026-02-01 | 30 | 0 | 7 | 0 | 2 | 5 | 0 |
 | Tunnel du Mont-Blanc (ATMB / GEIE-TMB) | 2026-01-01 | 0 | 2 | 0 | 0 | 0 | 0 | 0 |
 | Tunnel Maurice-Lemaire (APRR) | 2026-02-01 | 0 | 1 | 0 | 0 | 0 | 0 | 0 |
-| **Total** | | **57,964** | **27** | **1,373** | **15** | **1,000** | **126** | **232** |
+| **Total** | | **57,964** | **36** | **1,373** | **15** | **1,000** | **126** | **232** |
 
 1,126 of 1,358 real grid entries are located (83 %).
-After merging entries that name the same station in several grids, 658 of 860 stations are located (77 %); 22 of 27 toll points are.
+After merging entries that name the same station in several grids, 658 of 860 stations are located (77 %); 25 of 36 toll points are.
 
 ## Not located
 
@@ -55,6 +56,7 @@ through them will not detect them.
 - **ASF (VINCI Autoroutes)** (116): Aire-sur-Adour nord, Aire-sur-Adour sud, Aix ouest, Ambarès/St-Loubes, Ambes, Amboise/Château-Renault, Andrézieux-Bouthéon nord, Andrézieux-Bouthéon sud, Bd d’Estienne d’Orves, Biarritz (demi-échangeur nord), Biarritz (demi-échangeur sud), Blaye, Bretelle de Verfeil, Brive ouest, Broglie ouest, Capbreton (demi-échangeur nord), Capbreton (demi-échangeur sud), Carbon-Blanc, Chasse sud, Chatenois sud, Chaumes, Chaumont/Semoutiers, Châlons/La Veuve, Châlons/Mourmelon, Chémery, Communay, Dijon/Arc-sur- Tille, Fort de St-Priest, Francazal, Gatignolle, Gondreville nord, Gondreville sud, Hanipet, Haute-Perche, La Bouvinerie, La Croix Daurade, La Foucaudière, La Fouillouse, La Monnaie, La Roche-sur-Yon centre, La Roche-sur-Yon est, La Roche-sur-Yon ouest, La Roche-sur-Yon sud, Le Boulou (péage en système fermé), Le Caloy, Le Mans nord, Lentilly, Libourne ouest, Libourne/St-Antoine, Longué, Lormont, Luigny, L’Arbresle, L’Isle-sur-le-Doubs, L’Union, Marennes, Mions, Montastruc, Montauban nord, Montreuil-Reims, Mouguerre Elizaberry, Moulis, Mousserolles, Mûrs-Érigné, Nespouls, Pamiers Sud, Pellouailles-les-Vignes, Pont de Dorieux, Pont-d’Ain, Péage de Beaulieu-s.-Layon, Péage de Biriatou, Péage de Bénesse-Marenne, Péage de Corzé, Péage de Dijon/Crimolois, Péage de Lançon (Aix/Berre), Péage de Montpellier St-Jean, Péage de Mussidan, Péage de St-Christophe, Péage de Toulouse nord/est, Péage de Toulouse nord/ouest, Péage de Toulouse sud/est, Péage de Toulouse sud/ouest, Péage de Tours centre, Péage de la Négresse, Péage des Martres-d’Artière, Péage du Roumois, Péage d’Argentan, Péage d’Arles, Péage d’Arveyres, RD 323, RD 347, Rochefort nord, Rochefort ouest, Rognac Berre, Roques, Sainte-Eulalie, Salon nord, Sorges, St-Geours-de-Maremne, St-Jean-d’Angély, St-Martin-de-Crau est, St-Romain-sur-Cher, Sylans sud, Tarare est (péage en système fermé), Thenon est, Thivars, Tonnay-Charente (sortie 33), Tonnay-Charente (sortie 34), Val de Loing/Souppes, Valence-d’Agen, Vendargues, Vienne nord, Vienne sud, Villefranche-sur-Cher, Vénissieux, ZI nord
 - **ATMB (A40, A41 nord, B41)** (7): Chatillon, Cluses-Est, Cluses-Ouest, Findrol, Genève, Le Fayet, Scientrier
 - **Cofiroute (VINCI Autoroutes)** (15): ANGERS (CORZE), BARRIERE DE MONTREUIL AUX LIONS, BEAULIEU, CRIMOLOIS, DRUYE (CANDE), GONDREVILLE LA FRANCHE NORD, GONDREVILLE LA FRANCHE SUD, LE BIGNON, LES EPRUNES, ORMES, PARIS (LA FOLIE BESSIN), REIMS - TAISSY, ROUMOIS, TOURS CENTRE (MONNAIE), VITRE (LA GRAVELLE)
+- **Duplex A86 (VINCI Autoroutes)** (6): Duplex A86 Rueil → Vélizy (toll point), Duplex A86 Rueil → Vaucresson (toll point), Duplex A86 Vélizy → Rueil (toll point), Duplex A86 Vélizy → Vaucresson (toll point), Duplex A86 Vaucresson → Rueil (toll point), Duplex A86 Vaucresson → Vélizy (toll point)
 - **Escota (VINCI Autoroutes)** (10): Aix (A51), Aix (A57, A50, A52, A8), Beausoleil/ Monaco Est, Cannet-de-Meyreuil, Gémenos, La Bédoule, La Cadière, Six-Fours-Les Plages, St-Cyr-Les Lecques, Toulon-ouest
 - **Tunnels Prado Carénage et Prado Sud (SMTPC)** (1): Tunnels Prado Carénage + Sud (toll point)
 - **Sanef** (24): AMIENS EST (péage de Jules Verne), AMIENS SUD (péage de Dury), ARRAS EST (A1), ARRAS NORD (A26), BOULOGNE EST (péage d'Herquelingue), CALAIS (péage de Setques), CAMBRAI, FREYMING-MERLEBACH (A320), HORDAIN (péage d'Hordain), L'ISLE-ADAM (péage d'Amblainville), LILLE / DOURGES (péage de Fresnes), MARQUION, MEAUX (A140) / CRECY, METZ (A31), NEUFCHÂTEL-EN-BRAY (A28), PARIS / NOISY-LE-GRAND (péage de Coutevroult), PARIS / ROISSY (péage de Chamant), PÉRONNE / VALLEE DE LA SOMME, REIMS (péage de Courcy), REIMS EST (péage de Taissy), REIMS NORD (péage d'Ormes), REIMS OUEST (péage de Thillois), STRASBOURG, SURVILLIERS / SAINT-WITZ

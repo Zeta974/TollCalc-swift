@@ -15,13 +15,15 @@ public struct TollPoint: Identifiable, Hashable, Sendable {
     public let booths: [GeoPoint]
     public let tariff: PointTariff
     /// Ids of two points this one replaces when a trip passes them one after
-    /// the other, in either order: on the A79 free-flow section, driving
-    /// through both gantries of an interchange is billed once, at the
-    /// "transit" price, not as the sum of the two gantries.
-    public let combines: Set<String>
+    /// the other: on the A79 free-flow section, driving through both gantries
+    /// of an interchange is billed once, at the "transit" price; on the
+    /// Duplex A86, entering at one station and leaving at another is one trip.
+    public let combines: [String]
+    /// `combines` applies only in its order (entry, then exit), not reversed.
+    public let combinesInOrder: Bool
 
     public init(id: String, name: String, kind: Kind, networkID: String, location: GeoPoint?,
-                booths: [GeoPoint], tariff: PointTariff, combines: Set<String> = []) {
+                booths: [GeoPoint], tariff: PointTariff, combines: [String] = [], combinesInOrder: Bool = false) {
         self.id = id
         self.name = name
         self.kind = kind
@@ -30,6 +32,7 @@ public struct TollPoint: Identifiable, Hashable, Sendable {
         self.booths = booths
         self.tariff = tariff
         self.combines = combines
+        self.combinesInOrder = combinesInOrder
     }
 
     public var key: String { StationName.key(name) }
@@ -161,6 +164,19 @@ public struct PointTariff: Hashable, Sendable {
         let days: Set<Int>  // 1 = Monday … 7 = Sunday
         let from: Int  // minutes after midnight, inclusive
         let to: Int  // inclusive
+        /// Further conditions on the date, all required (Duplex A86 day types).
+        var filter = DayFilter()
+    }
+
+    struct DayFilter: Hashable, Sendable, Decodable {
+        /// Only in these months (1–12).
+        var months: Set<Int>?
+        /// Never in these months.
+        var exceptMonths: Set<Int>?
+        /// The day is (true) or is not (false) a public holiday from `holidays`.
+        var holiday: Bool?
+        /// The next day is (true) or is not (false) a public holiday.
+        var eveOfHoliday: Bool?
     }
 
     let heavyScheme: HeavyScheme
@@ -179,6 +195,10 @@ public struct PointTariff: Hashable, Sendable {
 
     func amount(for vehicle: Vehicle, at date: Date?) -> Amount {
         var needs = Set<TripInput>()
+        if self.periods.isEmpty {
+            // A Duplex A86 station alone: the price is per trip between two stations.
+            return .unavailable("Priced per trip between two stations")
+        }
 
         // A subscriber pays the subscription price where one exists, else the public one.
         let subscribed = self.periods.filter { !($0.subscriptions ?? []).isDisjoint(with: vehicle.subscriptions) }
@@ -262,7 +282,19 @@ public struct PointTariff: Hashable, Sendable {
                 day = holidayDay
             }
             let minute = c.hour! * 60 + c.minute!
-            return (bands[name] ?? []).contains { $0.days.contains(day) && (($0.from)...($0.to)).contains(minute) }
+            return (bands[name] ?? []).contains { rule in
+                guard rule.days.contains(day), (rule.from...rule.to).contains(minute) else { return false }
+                let f = rule.filter
+                if let months = f.months, !months.contains(c.month!) { return false }
+                if let months = f.exceptMonths, months.contains(c.month!) { return false }
+                if let wanted = f.holiday, wanted != isHoliday(year: c.year!, month: c.month!, day: c.day!) { return false }
+                if let wanted = f.eveOfHoliday {
+                    let next = Self.paris.dateComponents([.year, .month, .day],
+                                                         from: Self.paris.date(byAdding: .day, value: 1, to: date)!)
+                    if wanted != isHoliday(year: next.year!, month: next.month!, day: next.day!) { return false }
+                }
+                return true
+            }
         }
     }
 
@@ -346,11 +378,19 @@ extension PointTariff: Decodable {
         var bands: [String: [BandRule]] = [:]
         for (name, rules) in rawBands {
             bands[name] = try rules.map { rule in
-                guard rule.count == 3, case .days(let days) = rule[0], case .time(let from) = rule[1],
+                guard rule.count == 3 || rule.count == 4, case .days(let days) = rule[0], case .time(let from) = rule[1],
                       case .time(let to) = rule[2] else {
                     throw DecodingError.dataCorruptedError(forKey: .bands, in: c, debugDescription: "Bad band \(name)")
                 }
-                return BandRule(days: Set(days.compactMap { Self.dayNames[$0] }), from: try minutes(from), to: try minutes(to))
+                var filter = DayFilter()
+                if rule.count == 4 {
+                    guard case .filter(let f) = rule[3] else {
+                        throw DecodingError.dataCorruptedError(forKey: .bands, in: c, debugDescription: "Bad band \(name)")
+                    }
+                    filter = f
+                }
+                return BandRule(days: Set(days.compactMap { Self.dayNames[$0] }), from: try minutes(from), to: try minutes(to),
+                                filter: filter)
             }
         }
         self.bands = bands
@@ -397,13 +437,16 @@ extension PointTariff: Decodable {
     private enum BandField: Decodable {
         case days([String])
         case time(String)
+        case filter(DayFilter)
 
         init(from decoder: Decoder) throws {
             let c = try decoder.singleValueContainer()
             if let days = try? c.decode([String].self) {
                 self = .days(days)
+            } else if let time = try? c.decode(String.self) {
+                self = .time(time)
             } else {
-                self = .time(try c.decode(String.self))
+                self = .filter(try c.decode(DayFilter.self))
             }
         }
     }

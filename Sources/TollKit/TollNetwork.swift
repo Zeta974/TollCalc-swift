@@ -122,6 +122,7 @@ extension TollNetwork: Decodable {
         let booths: [[Double]]?
         let tariff: PointTariff
         let combines: [String]?
+        let combinesInOrder: Bool?
     }
 
     private struct RawStation: Decodable {
@@ -194,7 +195,8 @@ extension TollNetwork: Decodable {
             TollPoint(id: raw.id, name: raw.name, kind: raw.kind, networkID: networkID,
                       location: raw.lat.flatMap { lat in raw.lon.map { GeoPoint(latitude: lat, longitude: $0) } },
                       booths: (raw.booths ?? []).compactMap { $0.count == 2 ? GeoPoint(latitude: $0[0], longitude: $0[1]) : nil },
-                      tariff: raw.tariff, combines: Set(raw.combines ?? []))
+                      tariff: raw.tariff, combines: raw.combines ?? [],
+                      combinesInOrder: raw.combinesInOrder ?? false)
         }
     }
 }

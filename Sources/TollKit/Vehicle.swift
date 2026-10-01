@@ -77,10 +77,13 @@ public enum TripInput: String, Hashable, Sendable, Codable, CaseIterable {
 /// A subscription with its own per-passage price. Only per-passage prices are
 /// modelled; deposits and monthly fees are not part of a quote.
 public enum TollSubscription: String, CaseIterable, Codable, Sendable {
+    /// Any electronic toll badge (télépéage), whatever its issuer. The Duplex
+    /// A86 has a lower price for trips ending at Vaucresson with one.
+    case tollBadge = "toll-badge"
     /// Tunnels Prado (Marseille) "Tunnel Pass" badge.
     case pradoTunnelPass = "prado-tunnel-pass"
-    /// Tunnels Prado "Tunnel Pass+" badge (Ulys, also valid on motorways,
-    /// where it pays the public price).
+    /// Tunnels Prado "Tunnel Pass+" badge: an Ulys toll badge, so it also
+    /// gets the Duplex A86 badge price.
     case pradoTunnelPassPlus = "prado-tunnel-pass-plus"
 }
 

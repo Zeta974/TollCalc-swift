@@ -228,19 +228,27 @@ public struct TollCalculator: Sendable {
 
     // MARK: - Internals
 
-    /// Replaces two consecutive points with the point that bills them together.
+    /// Replaces two points with the point that bills them together. Points
+    /// of the same network passed in between are absorbed (a route through the
+    /// Duplex A86 from Rueil to Vélizy may come close to the Vaucresson booths);
+    /// the furthest match wins.
     private func mergingCombinedPoints(_ stops: [TollStop]) -> [TollStop] {
         var out: [TollStop] = []
         var i = 0
-        while i < stops.count {
-            if let a = stops[i].point, i + 1 < stops.count, let b = stops[i + 1].point,
-               let both = database.combined(a, b) {
-                out.append(.point(both))
-                i += 2
-            } else {
-                out.append(stops[i])
-                i += 1
+        next: while i < stops.count {
+            if let a = stops[i].point {
+                var j = i + 1
+                while j < stops.count, j <= i + 2, stops[j].point?.networkID == a.networkID { j += 1 }
+                for k in stride(from: j - 1, to: i, by: -1) {
+                    if let b = stops[k].point, let both = database.combined(a, b) {
+                        out.append(.point(both))
+                        i = k + 1
+                        continue next
+                    }
+                }
             }
+            out.append(stops[i])
+            i += 1
         }
         return out
     }

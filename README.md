@@ -93,6 +93,7 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 | Normandie and Tancarville bridges (from 1 May 2026) | Classes 1–4 | CCI Seine Estuaire |
 | A14 Montesson | Base / reduced rate by weekday and hour, public holidays | SAPN grid |
 | A14 Chambourcy | Flat | SAPN grid |
+| Duplex A86 (Rueil, Vaucresson, Vélizy), the 6 directional trips | Half-hour of entry × 5 day types (Mon–Thu, Friday or eve of a public holiday, Saturday, Sunday or public holiday, August working days); toll badge price on trips to Vaucresson | VINCI leaflet |
 | Prado-Carénage and Prado-Sud tunnels (Marseille), each or both in a row | Class 1; Tunnel Pass / Tunnel Pass+ prices by day (7h–20h) and night | Operator's price page (screenshot in `Tools/raw/other/`) |
 | A79 free-flow gantries (Le Montet, Montbeugny, Molinet) | Per gantry or "transit" through both gantries of an interchange; very low emission cars (Crit'Air 0 / electric); trucks by Euro class | ALIAE leaflet |
 
@@ -102,7 +103,6 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 
 | What | Why |
 |---|---|
-| Duplex A86 (VINCI) | Priced by entry, direction, half-hour, day type (incl. eves of public holidays and August working days) and payment method. Needs its own model; the PDF is in `Tools/raw/other/`. |
 | Motorway subscriptions, discounts, return tickets | Only the public one-way price is modelled. Commuter offers are tied to a registered trip and monthly use, and need each operator's terms. |
 
 ## How exactness is checked
@@ -118,6 +118,7 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 - **Mont-Blanc and Fréjus:** the France-side prices, from two different operators' pages, are identical.
 - **Sanef / SAPN:** parsed from the table cells; each class page's plain text must contain exactly the same prices. Each column of the A1 time grid is matched to the only Sanef station whose regular fares equal its "normal" prices, and all 122 matched.
 - **A79 gantries:** the leaflet's table is an image, so it is transcribed. The Journal officiel prints the same table as text: 7 of its 9 gantries match on all 14 prices. The first two differ (the JO lists an extra "Deux-Chaises / Ouest" gantry and a 1,20 € Le Montet transit). Ulys bills the leaflet's figures (Montluçon → Mâcon, class 1: 3,30 + 1,00 + 1,90 + 1,30 = 7,50 €), so the leaflet is used. Unit tests also check trips of the leaflet's trip table.
+- **Duplex A86:** each price is read from its table cell, merged cells spanning several half-hours. All 398 values, table by table and row by row, equal the numbers of the page's plain text in the same order.
 - **Across operators:** wherever two grids price the same trip (APRR↔ASF, APRR↔Cofiroute, ASF↔Cofiroute, ALIS↔ASF, ARCOUR↔Cofiroute, A'LIÉNOR↔ASF, A79↔APRR/Cofiroute: about 5,600 trips), they agree to the cent. A unit test checks every shared pair.
 - **VINCI's own summary:** VINCI's "principales liaisons" table and the guides' worked examples match on all classes.
 
@@ -132,7 +133,9 @@ Coverage below is as of 30 September 2026. `COVERAGE.md` has the per-grid detail
 - **Undeclared Euro class:** a heavy vehicle without one pays the "non modulé" price where one is published. Where none is, the Euro class is required.
 - **A14 Montesson:** the reduced rate applies "du lundi au vendredi hors jours fériés de 10h à 16h et de 21h à 6h". It is not stated whether the 21h–6h window runs on after Friday night or starts on Sunday night, so on Saturday and Monday 00:00–05:59 the quote is the range between the two rates.
 - **A79 transit:** passing both gantries of an interchange (Ouest then Est, or the reverse) is billed once at the "transit" price, as the leaflet's trip table and Ulys do. Trucks have no price for an undeclared Euro class there, so the quote asks for it.
-- **Subscriptions:** `Vehicle.subscriptions` lists badges held. Where a toll has a subscriber price for one of them, the quote uses it, otherwise the public price. Deposits and monthly fees are not part of a trip's price. Only the Prado Tunnel Pass and Tunnel Pass+ are modelled.
+- **Duplex A86 day types:** taken from the leaflet's footnotes. "Friday or eve" covers Fridays and Monday–Thursday eves of public holidays, outside August. In August, Monday to Saturday use the August row; Sundays and public holidays use their own row all year. Times after midnight belong to that calendar day. The price is the one at the time given for the trip (the entry time). Holidays follow the usual French list, which matches the leaflet's 2026 dates.
+- **Duplex A86 detection:** each station is a point placed on its OSM toll booth, with no price of its own. Entering at one and leaving at another is replaced by that trip's price. A third station passed in between (a route from Rueil to Vélizy may run close to Vaucresson) is absorbed. The leaflet prints no vehicle class; the tunnel only takes light vehicles under 2 m, so the price is class 1.
+- **Subscriptions:** `Vehicle.subscriptions` lists badges held. Where a toll has a subscriber price for one of them, the quote uses it, otherwise the public price. Deposits and monthly fees are not part of a trip's price. Modelled: any toll badge (Duplex A86), and the Prado Tunnel Pass and Tunnel Pass+.
 - **Prado tunnels:** the page prints one price per tunnel without a vehicle class, so only class 1 is priced. "De 7h à 20h" is read as 07:00–19:59. Taking both tunnels in a row has its own price: 6,20 € (the sum), but 5,80 / 5,40 € for subscribers, 10 or 20 cents more than the sum. The booths of the two tunnels are about 100 m apart at Rabatau, so detecting them from a route still needs a test on a real route.
 - **A1 time grid:** its "normal" prices equal the regular grid, so it is read as trips towards Paris (northern entry, southern exit). The reverse direction uses the regular fare.
 - **Puymorens:** Légifrance also refuses this environment. The five prices were transcribed from its text; classes 1–4 match a second source, class 5 (4,60 €) has only that one.

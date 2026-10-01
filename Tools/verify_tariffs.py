@@ -183,6 +183,10 @@ def check_points():
     ok &= same
     print(f"tunnels: Mont-Blanc (ATMB page) vs Fréjus (SFTRF leaflet), France side -> {'OK' if same else 'MISMATCH'}")
     ok &= check_a79()
+    import duplex
+    same, count = duplex.check_text()
+    ok &= same
+    print(f"duplex-a86: {count} prices read from the table cells vs page text, in order -> {'OK' if same else 'MISMATCH'}")
     return ok
 
 

@@ -458,6 +458,24 @@ def prado():
     return out
 
 
+
+def duplex_a86():
+    """Duplex A86: one point per station (where its booths are) with no price
+    of its own, and one point per trip that replaces entering at one station
+    then leaving at another, in that order. Prices from Tools/duplex.py."""
+    import duplex
+    booths = {"Rueil": [[48.869915, 2.158058]],  # OSM toll booths on the A86 (n137501371,
+              "Vaucresson": [[48.832414, 2.147471]],  # n1200571098, n1238723845)
+              "Vélizy": [[48.782806, 2.157287]]}
+    out = [{"name": f"Duplex A86 {station}", "kind": "tunnel", "booths": b,
+            "tariff": {"heavyScheme": "standard", "periods": []}} for station, b in booths.items()]
+    for (entry, exit_), prices in duplex.parse().items():
+        out.append({"name": f"Duplex A86 {entry} → {exit_}", "kind": "tunnel", "tariff": duplex.tariff(prices),
+                    "combines": [f"duplex-a86:Duplex A86 {entry}", f"duplex-a86:Duplex A86 {exit_}"],
+                    "combinesInOrder": True})
+    return out
+
+
 POINT_NETWORKS = {
     "cevm": ("CEVM (Viaduc de Millau)", millau),
     "atlandes": ("ATLANDES (A63 Salles – Saint-Geours-de-Maremne)", atlandes),
@@ -471,6 +489,7 @@ POINT_NETWORKS = {
     "sapn-a14": ("SAPN (A14 Montesson, Chambourcy)", a14),
     "aliae-a79": ("ALIAE (A79 flux libre)", a79),
     "prado": ("Tunnels Prado Carénage et Prado Sud (SMTPC)", prado),
+    "duplex-a86": ("Duplex A86 (VINCI Autoroutes)", duplex_a86),
 }
 
 POINT_SOURCES = {
@@ -486,6 +505,7 @@ POINT_SOURCES = {
     "sapn-a14": ("2026-02-01", "https://www.autoroutes.sanef.com/sites/default/files/2026-01/2026_02-Grille-SAPN.pdf"),
     "aliae-a79": ("2026-02-01", "https://www.aliae.com/files/live/sites/aliae/files/Documents/TARIFS_ALIAE-2026.pdf"),
     "prado": ("2026-10-01", "https://www.tunnelsprado.com/"),
+    "duplex-a86": ("2026-01-01", "https://public-content.vinci-autoroutes.com/PDF/Tarifs-Duplex-A86/Tarifs-Duplex-2026.pdf"),
 }
 
 
