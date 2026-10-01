@@ -60,6 +60,9 @@ Tools/vinci_charts.py         reader for the ASF / Escota chart PDFs
 Tools/verify_tariffs.py       PDF ↔ JSON checks
 Tools/raw/                    the official PDFs
 Tools/data/osm_toll_booths.json  OpenStreetMap toll booth snapshot
+android/                      Android port (Gradle)
+  tollkit/                    TollKit in pure Kotlin (Android + JVM), same JSON grids
+  app/                        minimal Jetpack Compose demo (stations itinerary)
 ```
 
 ## Running
@@ -94,6 +97,34 @@ let q = calculator.quote(TollItinerary(stops: stops, vehicleClass: .class5))
 let passages = RouteTollDetector(database: db).passages(along: polylinePoints)
 let routeQuote = calculator.quote(passages: passages.map(\.station), vehicleClass: .class1)
 ```
+
+## Android
+
+`android/tollkit` is a line-by-line Kotlin port of TollKit. It depends only on the Kotlin standard library and reads the **same** `Sources/TollKit/Resources/networks/*.json` files: nothing is copied, so `Tools/build_tariffs.py` stays the single source of tariffs for both platforms. The Swift unit tests are ported one-to-one in `TollKitTest.kt`.
+
+```sh
+cd android
+./gradlew :tollkit:test          # engine + tests on any JVM (no Android SDK needed)
+./gradlew :app:assembleDebug     # demo APK (needs the Android SDK, API 35; minSdk 26)
+```
+
+```kotlin
+import com.tollcalc.tollkit.*
+
+val db = TollDatabase.bundled()              // ~2 MB of JSON: call off the main thread
+val calculator = TollCalculator(db)
+
+calculator.quote("ALLAINES", "AMBERIEU", VehicleClass.CLASS1).total   // 58,20 €
+
+val stops = listOf("ALLAINES", "AMBERIEU").mapNotNull(db::station)
+calculator.quote(TollItinerary(stops, VehicleClass.CLASS5))
+
+// A route polyline from any routing service, as GeoPoint(lat, lon)
+val passages = RouteTollDetector(db).passages(polyline)
+calculator.quote(passages.map { it.station }, VehicleClass.CLASS1)
+```
+
+The demo app covers the "Gares" mode only (pick stations → price). Route mode needs a routing provider on Android (Google Maps, OSRM…); the engine side (`RouteTollDetector`) is ready for it.
 
 ## How the price is computed
 
