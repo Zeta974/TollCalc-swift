@@ -1,5 +1,5 @@
 {
-"source": "OpenStreetMap contributors, ODbL 1.0 — barrier=toll_booth in France, fetched 2026-09-30 via Overpass API",
+"source": "OpenStreetMap contributors, ODbL 1.0 — barrier=toll_booth and highway=toll_gantry in France, fetched 2026-09-30 via Overpass API",
 "elements": [
 {
 "osm": "n100086450",
@@ -640,6 +640,16 @@
 "lon": -61.522568
 },
 {
+"osm": "n1131546232",
+"lat": 48.910234,
+"lon": 2.048088,
+"name": "Chambourcy",
+"operator": "SAPN",
+"ref": "Chambourcy",
+"road": "A 14",
+"gantry": true
+},
+{
 "osm": "n11343377116",
 "lat": 43.487422,
 "lon": 4.145114
@@ -735,6 +745,114 @@
 "operator": "Cofiroute",
 "ref": "20",
 "road": "A 11"
+},
+{
+"osm": "n11578487416",
+"lat": 46.389173,
+"lon": 3.033098,
+"name": "Le Montet Ouest",
+"operator": "aliae",
+"road": "A79",
+"gantry": true
+},
+{
+"osm": "n11578487417",
+"lat": 46.389153,
+"lon": 3.033223,
+"name": "Le Montet Ouest",
+"operator": "aliae",
+"road": "A79",
+"gantry": true
+},
+{
+"osm": "n11578487418",
+"lat": 46.417318,
+"lon": 3.107274,
+"name": "Le Montet Est",
+"operator": "aliae",
+"road": "A79",
+"gantry": true
+},
+{
+"osm": "n11578487419",
+"lat": 46.417387,
+"lon": 3.107182,
+"name": "Le Montet Est",
+"operator": "aliae",
+"road": "A79",
+"gantry": true
+},
+{
+"osm": "n11578487420",
+"lat": 46.50442,
+"lon": 3.426155,
+"name": "Montbeugny Ouest",
+"operator": "aliae",
+"road": "A79",
+"gantry": true
+},
+{
+"osm": "n11578487421",
+"lat": 46.504331,
+"lon": 3.426192,
+"name": "Montbeugny Ouest",
+"operator": "aliae",
+"road": "A79",
+"gantry": true
+},
+{
+"osm": "n11578487422",
+"lat": 46.516329,
+"lon": 3.469011,
+"name": "Montbeugny Est",
+"operator": "aliae",
+"road": "A79",
+"gantry": true
+},
+{
+"osm": "n11578487423",
+"lat": 46.516414,
+"lon": 3.468947,
+"name": "Montbeugny Est",
+"operator": "aliae",
+"road": "A79",
+"gantry": true
+},
+{
+"osm": "n11578487424",
+"lat": 46.463195,
+"lon": 3.977336,
+"name": "Molinet Est",
+"operator": "aliae",
+"road": "A79",
+"gantry": true
+},
+{
+"osm": "n11578487425",
+"lat": 46.463282,
+"lon": 3.977299,
+"name": "Molinet Est",
+"operator": "aliae",
+"road": "A79",
+"gantry": true
+},
+{
+"osm": "n11578487426",
+"lat": 46.456247,
+"lon": 3.904243,
+"name": "Molinet Ouest",
+"operator": "aliae",
+"road": "A79",
+"gantry": true
+},
+{
+"osm": "n11578487427",
+"lat": 46.456343,
+"lon": 3.904246,
+"name": "Molinet Ouest",
+"operator": "aliae",
+"road": "A79",
+"gantry": true
 },
 {
 "osm": "n1171129525",
@@ -838,6 +956,20 @@
 "osm": "n12118516946",
 "lat": 43.656446,
 "lon": 7.180112
+},
+{
+"osm": "n12120628914",
+"lat": 48.914294,
+"lon": 2.151098,
+"name": "Montesson",
+"gantry": true
+},
+{
+"osm": "n12120628915",
+"lat": 48.914218,
+"lon": 2.151085,
+"name": "Montesson",
+"gantry": true
 },
 {
 "osm": "n12134121004",
@@ -1026,6 +1158,22 @@
 "road": "A 41"
 },
 {
+"osm": "n12556749185",
+"lat": 49.196678,
+"lon": 1.229748,
+"name": "Heudebouville",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n12556749186",
+"lat": 49.197394,
+"lon": 1.228109,
+"name": "Heudebouville",
+"operator": "SAPN",
+"gantry": true
+},
+{
 "osm": "n1258445184",
 "lat": 43.744191,
 "lon": 7.378062,
@@ -1116,6 +1264,34 @@
 "road": "A 48"
 },
 {
+"osm": "n12636038008",
+"lat": 48.990977,
+"lon": 1.643315,
+"name": "Buchelay",
+"gantry": true
+},
+{
+"osm": "n12636038009",
+"lat": 48.990847,
+"lon": 1.643261,
+"name": "Buchelay",
+"gantry": true
+},
+{
+"osm": "n12636038010",
+"lat": 49.00439,
+"lon": 1.603742,
+"name": "Rosny-sur-Seine",
+"gantry": true
+},
+{
+"osm": "n12636038011",
+"lat": 49.004298,
+"lon": 1.603597,
+"name": "Rosny-sur-Seine",
+"gantry": true
+},
+{
 "osm": "n1264038008",
 "lat": 48.036773,
 "lon": 3.022626,
@@ -1161,6 +1337,70 @@
 "road": "A 1"
 },
 {
+"osm": "n12736493889",
+"lat": 49.167957,
+"lon": -0.248478,
+"name": "Cagny",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n12736494201",
+"lat": 49.168332,
+"lon": -0.245019,
+"name": "Cagny",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n12736498447",
+"lat": 49.178629,
+"lon": -0.200765,
+"name": "Troarn",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n12736555742",
+"lat": 49.228502,
+"lon": -0.081239,
+"name": "Dozulé",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n12736555743",
+"lat": 49.228405,
+"lon": -0.081189,
+"name": "Dozulé",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n12736920975",
+"lat": 49.377081,
+"lon": 0.626726,
+"name": "Bourneville",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n12736955010",
+"lat": 49.38491,
+"lon": 0.603663,
+"name": "Bourneville",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n12736955011",
+"lat": 49.38497,
+"lon": 0.603818,
+"name": "Bourneville",
+"operator": "SAPN",
+"gantry": true
+},
+{
 "osm": "n1274932342",
 "lat": 48.39784,
 "lon": 0.104689,
@@ -1191,6 +1431,38 @@
 "osm": "n12754267128",
 "lat": 48.649072,
 "lon": 7.245372
+},
+{
+"osm": "n12774558827",
+"lat": 49.195066,
+"lon": 1.2299,
+"name": "Heudebouville",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n12774558828",
+"lat": 49.195126,
+"lon": 1.230116,
+"name": "Heudebouville",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n12774558848",
+"lat": 49.193416,
+"lon": 1.230171,
+"name": "Heudeboville",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n12774558849",
+"lat": 49.194921,
+"lon": 1.231927,
+"name": "Heudeboville",
+"operator": "SAPN",
+"gantry": true
 },
 {
 "osm": "n1281886638",
@@ -1391,6 +1663,96 @@
 "road": "A 5"
 },
 {
+"osm": "n13282929780",
+"lat": 49.247191,
+"lon": 1.18002,
+"name": "Incarville",
+"operator": "SAPN",
+"ref": "19",
+"road": "A 154",
+"gantry": true
+},
+{
+"osm": "n13282929781",
+"lat": 49.248094,
+"lon": 1.179388,
+"name": "Incarville",
+"operator": "SAPN",
+"ref": "19",
+"road": "A 154",
+"gantry": true
+},
+{
+"osm": "n13283071986",
+"lat": 49.36426,
+"lon": 0.467552,
+"name": "Toutainville",
+"operator": "SAPN",
+"ref": "27",
+"road": "A 13",
+"gantry": true
+},
+{
+"osm": "n13283109002",
+"lat": 49.338152,
+"lon": 0.367808,
+"name": "Beuzeville",
+"operator": "SAPN",
+"ref": "28",
+"road": "A 13",
+"gantry": true
+},
+{
+"osm": "n13283109013",
+"lat": 49.337577,
+"lon": 0.369392,
+"name": "Beuzeville",
+"operator": "SAPN",
+"ref": "28",
+"road": "A 13",
+"gantry": true
+},
+{
+"osm": "n13283109014",
+"lat": 49.337562,
+"lon": 0.369457,
+"name": "Beuzeville",
+"operator": "SAPN",
+"ref": "28",
+"road": "A 13",
+"gantry": true
+},
+{
+"osm": "n13283109044",
+"lat": 49.338024,
+"lon": 0.374284,
+"name": "Beuzeville",
+"operator": "SAPN",
+"ref": "28",
+"road": "A 13",
+"gantry": true
+},
+{
+"osm": "n13283113928",
+"lat": 49.366367,
+"lon": 0.818092,
+"name": "Bourg-Achard",
+"operator": "SAPN",
+"ref": "25",
+"road": "A 13",
+"gantry": true
+},
+{
+"osm": "n13283113929",
+"lat": 49.366423,
+"lon": 0.818139,
+"name": "Bourg-Achard",
+"operator": "SAPN",
+"ref": "25",
+"road": "A 13",
+"gantry": true
+},
+{
 "osm": "n1330238093",
 "lat": 46.235694,
 "lon": 5.273412,
@@ -1553,6 +1915,30 @@
 "lat": 45.983119,
 "lon": 5.634706,
 "name": "Redevance nordique"
+},
+{
+"osm": "n13682107013",
+"lat": 49.320538,
+"lon": 0.311068,
+"name": "Quetteville",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n13682107014",
+"lat": 49.320798,
+"lon": 0.310376,
+"name": "Péage de Quetteville",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n13682107015",
+"lat": 49.320586,
+"lon": 0.311133,
+"name": "Quetteville",
+"operator": "SAPN",
+"gantry": true
 },
 {
 "osm": "n136834",
@@ -2039,6 +2425,18 @@
 "operator": "APRR",
 "ref": "6",
 "road": "A 31"
+},
+{
+"osm": "n14214183382",
+"lat": 43.601986,
+"lon": 1.758858,
+"gantry": true
+},
+{
+"osm": "n14214183383",
+"lat": 43.601931,
+"lon": 1.758782,
+"gantry": true
 },
 {
 "osm": "n142268",
@@ -3547,6 +3945,16 @@
 "road": "A 4"
 },
 {
+"osm": "n1831379876",
+"lat": 48.911806,
+"lon": 2.046724,
+"name": "Chambourcy",
+"operator": "SAPN",
+"ref": "Chambourcy",
+"road": "A 14",
+"gantry": true
+},
+{
 "osm": "n1838205657",
 "lat": 47.018942,
 "lon": -0.880739,
@@ -4297,6 +4705,16 @@
 "operator": "ASF",
 "ref": "9",
 "road": "A 64"
+},
+{
+"osm": "n2279710264",
+"lat": 49.140466,
+"lon": 6.464733,
+"name": "Boulay",
+"operator": "SANEF",
+"ref": "36",
+"road": "A 4",
+"gantry": true
 },
 {
 "osm": "n2279783517",
@@ -5464,6 +5882,16 @@
 "road": "A 8"
 },
 {
+"osm": "n25555359",
+"lat": 49.338048,
+"lon": 0.367813,
+"name": "Beuzeville",
+"operator": "SAPN",
+"ref": "28",
+"road": "A 13",
+"gantry": true
+},
+{
 "osm": "n255871598",
 "lat": 43.154158,
 "lon": 1.616033,
@@ -6543,6 +6971,14 @@
 "operator": "Autoroutes du Sud de la France",
 "ref": "Péage de Biriatou",
 "road": "A 63"
+},
+{
+"osm": "n280921541",
+"lat": 49.17781,
+"lon": -0.202963,
+"name": "Troarn",
+"operator": "SAPN",
+"gantry": true
 },
 {
 "osm": "n280985131",
@@ -9707,6 +10143,16 @@
 "road": "A 10"
 },
 {
+"osm": "n4127435620",
+"lat": 49.339064,
+"lon": 0.368078,
+"name": "Beuzeville",
+"operator": "SAPN",
+"ref": "28",
+"road": "A 13",
+"gantry": true
+},
+{
 "osm": "n4159823901",
 "lat": 47.785843,
 "lon": 3.587957
@@ -10793,6 +11239,22 @@
 "operator": "ASF",
 "ref": "Péage de Bénesse-Maremne",
 "road": "A 63"
+},
+{
+"osm": "n467120960",
+"lat": 49.229927,
+"lon": -0.082477,
+"name": "Dozulé",
+"operator": "SAPN",
+"gantry": true
+},
+{
+"osm": "n467120982",
+"lat": 49.230005,
+"lon": -0.082439,
+"name": "Dozulé",
+"operator": "SAPN",
+"gantry": true
 },
 {
 "osm": "n4681594641",
@@ -12789,6 +13251,16 @@
 "road": "A 355"
 },
 {
+"osm": "n6877959073",
+"lat": 49.364232,
+"lon": 0.467663,
+"name": "Toutainville",
+"operator": "SAPN",
+"ref": "27",
+"road": "A 13",
+"gantry": true
+},
+{
 "osm": "n690686570",
 "lat": 48.588119,
 "lon": 2.724837,
@@ -13089,6 +13561,14 @@
 "operator": "APRR",
 "ref": "10",
 "road": "A 39"
+},
+{
+"osm": "n7346104910",
+"lat": 45.610584,
+"lon": 5.894167,
+"name": "Chambéry Nord",
+"operator": "AREA",
+"gantry": true
 },
 {
 "osm": "n735016190",
@@ -13998,6 +14478,14 @@
 "road": "A 11"
 },
 {
+"osm": "n8477079441",
+"lat": 49.378263,
+"lon": 0.624603,
+"name": "Bourneville",
+"operator": "SAPN",
+"gantry": true
+},
+{
 "osm": "n848265449",
 "lat": 46.050091,
 "lon": 6.080527,
@@ -14292,6 +14780,16 @@
 "operator": "ASF",
 "ref": "10",
 "road": "A 83"
+},
+{
+"osm": "n90457331",
+"lat": 49.141099,
+"lon": 6.466559,
+"name": "Boulay",
+"operator": "SANEF",
+"ref": "36",
+"road": "A 4",
+"gantry": true
 },
 {
 "osm": "n9063255096",

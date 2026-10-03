@@ -194,8 +194,8 @@ def horizontal_lines(page, style):
     for l in lines:
         text = "".join(c["text"] for c in l["chars"] if _font(c) != style.exit_font)
         exit_ = "".join(c["text"] for c in l["chars"] if _font(c) == style.exit_font).strip()
-        m = re.match(r"^(\d+(?:\.\d+)?[a-z]?) (.*)$", " ".join(text.split()))
-        if m and not exit_:  # exit number in the label font, e.g. "56 Monaco"
+        m = re.match(r"^(\d+(?:\.\d+)?[a-z]?) ?([A-ZÀ-Ý].*)$", " ".join(text.split()))
+        if m and not exit_:  # exit number in the label font, e.g. "56 Monaco" or "56Monaco"
             exit_, text = m.group(1), m.group(2)
         text = " ".join(text.split())
         if text:

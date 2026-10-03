@@ -1,83 +1,18 @@
 # TollCalc
 
-iOS app to calculate French motorway tolls. v1 covers the basics:
+**TollKit** is a Swift package that prices French toll roads exactly. It has no UI and no map provider; apps, servers or other tools are meant to be built on top of it.
 
-- **Map & routing:** Apple MapKit. It's free, needs no API key, and includes geocoding and driving directions.
-- **Toll data:** the operators' official 2026 tariff grids, converted to JSON and bundled in the app.
-- **Itinerary:** type a start and an end point (MapKit route → toll stations crossed → price), or pick the toll stations yourself.
-- **Exact pricing:** every price comes straight from a published entry → exit fare and is stored in euro cents. The app never interpolates or estimates. If a stretch of the trip is in no loaded grid, it is shown as *non publié* and the total is marked incomplete.
+It contains:
+- **The data:** official 2026 tariffs, converted to JSON and checked against the source documents (`Sources/TollKit/Resources/networks/`).
+- **The engine:** prices tickets, barriers, bridges and tunnels, including seasonal, time-of-day and Euro-emission pricing.
+- **Route detection:** finds the toll stations and points a route polyline goes through, using OpenStreetMap positions.
+- **The pipeline:** turns the operators' PDFs into that JSON and verifies it (`Tools/`).
 
-The UI is deliberately minimal and will be redesigned later.
+**Exact means:** every price comes from a published table and is handled in integer euro cents.
+- When a price depends on something you did not give (the date, a truck's axle count…), you get the published minimum and maximum plus the list of missing inputs.
+- When nothing publishes a price, you get "unavailable", never an estimate.
 
-## Coverage
-
-| Grid | Source | In force since | Fares | Stations with GPS position |
-|---|---|---|---|---|
-| APRR (A5, A6, A19, A26, A31, A36, A39, A40, A42, A71, A77…, including tickets that end on neighbouring networks) | [TARIFS_APRR.pdf](https://voyage.aprr.fr/sites/default/files/2026-02/TARIFS_APRR.pdf) | 1 Feb 2026 | 21,505 | 155 / 177 |
-| AREA (A41, A43, A48, A49, A51, A410, A430, A432 internal) | [TARIFS_INTERNES_AREA.pdf](https://voyage.aprr.fr/sites/default/files/2026-01/TARIFS_INTERNES_AREA.pdf) | 1 Feb 2026 | 815 | 44 / 45 |
-| ALIAE A79, Deux-Chaises barrier | [TARIFS_ALIAE-2026.pdf](https://www.aliae.com/files/live/sites/aliae/files/Documents/TARIFS_ALIAE-2026.pdf) | 1 Feb 2026 | 324 | 143 / 163 |
-| **VINCI – Cofiroute** (A10 Paris–Tours, A11, A28, A71, A81, A85, A19, plus tickets onto APRR/Sanef) | [Cofiroute guide](https://public-content.vinci-autoroutes.com/PDF/Tarifs-peage-Cofiroute/Cofiroute-Guide-tarifaire-2026.pdf) | 1 Feb 2026 | 11,004 | 200 / 251 |
-| **VINCI – ASF** (A7, A8, A9, A10 Tours–Bordeaux, A20, A46, A54, A61, A62, A63, A64, A66, A68, A72, A83, A87, A89, A709, A837…) | [per-class grids C1–C5](https://public-content.vinci-autoroutes.com/PDF/Tarifs-peage-asf/C1-TARIFS-WEB-2026-maille_maj062026.pdf) | 1 Jun 2026 | 18,508 | 321 / 499 |
-| **VINCI – Escota** (A8 Aix–Menton, A50, A51, A52, A57, A500) | [Escota guide](https://public-content.vinci-autoroutes.com/PDF/Tarifs-peage-Escota/Escota-Guide-tarifaire-2026.pdf) | 1 Feb 2026 | 2,260 | 31 / 55 |
-
-All five vehicle classes are included. The ASF station count includes the APRR, Cofiroute and Sanef stations that ASF prints tickets to.
-
-**Not covered yet:**
-- **Sanef/SAPN:** their site refused this build's downloads.
-- **ATMB, SFTRF and the tunnels.**
-- **Time-of-day pricing:** VINCI's A355 (Strasbourg bypass), the Duplex A86 and the A1.
-- **Free-flow sections:** the A79 gantries and A13/A14.
-
-A trip that uses any of these gets an incomplete quote, never a guessed one. To add a network, add a parser to `Tools/build_tariffs.py` that writes the same JSON format. No Swift changes are needed.
-
-### How the VINCI grids are read
-
-- **Cofiroute** publishes a normal table.
-- **ASF and Escota** only publish *charts*:
-  - Stations are written at 45° along a staircase, and each cell is the price between a row station and a column station.
-  - Rectangular blocks price trips between two motorway sections.
-
-`Tools/vinci_charts.py` rebuilds these charts from glyph positions: cells, rotated labels, exit numbers, labels that wrap onto two lines, and two stations sharing one row. It refuses any cell or label it cannot place. The charts are symmetric, so each price applies in both directions. Stations that share a name get their exit number appended, e.g. `Tonnay-Charente (sortie 33)` and `(sortie 34)`.
-
-Three free (0 €) links on the Toulouse ring are left out: one ASF chart shows them as 0 € and another as "not possible".
-
-## Project layout
-
-```
-Package.swift                 TollKit: pure-Swift pricing engine (iOS, macOS, Linux)
-Sources/TollKit/
-  Money.swift                 integer euro cents
-  VehicleClass.swift          classes 1–5
-  TollNetwork.swift           one official grid (entry → exit fares)
-  TollDatabase.swift          all grids, stations merged across grids
-  TollCalculator.swift        quotes, itineraries
-  RouteTollDetector.swift     route polyline → toll stations crossed, in order
-  Resources/networks/*.json   generated tariff data
-App/TollCalc/                 SwiftUI + MapKit app
-project.yml                   XcodeGen spec for the iOS app
-Tools/build_tariffs.py        PDF grids → JSON (+ OSM coordinates)
-Tools/vinci_charts.py         reader for the ASF / Escota chart PDFs
-Tools/verify_tariffs.py       PDF ↔ JSON checks
-Tools/raw/                    the official PDFs
-Tools/data/osm_toll_booths.json  OpenStreetMap toll booth snapshot
-android/                      Android port (Gradle)
-  tollkit/                    TollKit in pure Kotlin (Android + JVM), same JSON grids
-  app/                        minimal Jetpack Compose demo (stations itinerary)
-```
-
-## Running
-
-```sh
-# Pricing engine and tests (macOS or Linux)
-swift test
-
-# iOS app (macOS with Xcode 15+)
-brew install xcodegen
-xcodegen            # creates TollCalc.xcodeproj from project.yml
-open TollCalc.xcodeproj
-```
-
-Using the engine directly:
+## Using it
 
 ```swift
 import TollKit
@@ -85,22 +20,166 @@ import TollKit
 let db = try TollDatabase.bundled()
 let calculator = TollCalculator(database: db)
 
-// A single ticket
-let quote = try calculator.quote(from: "ALLAINES", to: "AMBERIEU", vehicleClass: .class1)
-print(quote.total)   // 58,20 €
+// One closed-system ticket
+let q = try calculator.quote(from: "ALLAINES", to: "AMBERIEU", vehicleClass: .class1)
+q.total                       // 58,20 €
 
-// An itinerary (stations in driving order)
-let stops = ["ALLAINES", "AMBERIEU"].compactMap(db.station(named:))
-let q = calculator.quote(TollItinerary(stops: stops, vehicleClass: .class5))
+// A trip through stations and toll points, at a given time
+let stops: [TollStop] = ["Chatillon", "Viaduc de Millau", "Origine"].compactMap(db.stop(named:))
+let trip = calculator.quote(stops: stops, vehicle: Vehicle(.class1), date: someDate)
+trip.lines                    // each ticket / barrier with its Amount
+trip.total                    // exact total, or nil if a line is a range or unavailable
+trip.totalRange               // (min, max) when some input is missing
+trip.missingInputs            // e.g. [.date]
 
-// A route polyline, e.g. from MKRoute
-let passages = RouteTollDetector(database: db).passages(along: polylinePoints)
-let routeQuote = calculator.quote(passages: passages.map(\.station), vehicleClass: .class1)
+// Trucks: Euro class, axles and weight matter on some roads
+let truck = Vehicle(.class4, euroClass: .euro6, axles: 5)
+
+// A route polyline (from any router)
+let (passages, routeQuote) = calculator.quote(route: polyline, vehicle: truck, date: someDate)
+```
+
+The main types:
+
+| Type | Role |
+|---|---|
+| `Vehicle` | Class 1–5, plus optional Euro class, axles, gross weight (PTAC), natural gas |
+| `SanefA1Period` | Normal / green / red level on the A1, when you know it |
+| `TollStop` | `.station` (a stop of a closed-system grid) or `.point` (barrier, bridge, tunnel) |
+| `Amount` | `.exact`, `.range(min, max, needs:)`, `.unavailable(reason)` |
+| `TollQuote` | Ordered lines, plus `total`, `totalRange`, `isExact`, `isComplete` and `missingInputs` |
+| `RouteTollDetector` | Polyline → ordered passages |
+
+`swift test` runs the suite (31 tests; Linux or macOS).
+
+## Coverage
+
+Coverage below is as of 1 October 2026. Every station and toll point a route can go through has a position; `COVERAGE.md` has the per-grid detail.
+
+### Closed-system grids (entry → exit tickets, 5 classes)
+
+| Operator | Motorways | Source | Trips priced |
+|---|---|---|---:|
+| APRR | A5, A6, A19, A26, A31, A36, A39, A40, A42, A71, A77…, including tickets onto neighbouring networks | APRR 2026 grid | 21,505 |
+| AREA | A41, A43, A48, A49, A51, A410, A430, A432 | AREA 2026 grid | 815 |
+| ALIAE | A79, Deux-Chaises barrier | ALIAE 2026 grid | 324 |
+| VINCI – Cofiroute | A10 Paris–Tours, A11, A28, A71, A81, A85… | Cofiroute guide | 11,004 |
+| VINCI – ASF | A7, A8, A9, A10, A20, A46, A54, A61–A64, A66, A68, A72, A83, A87, A89… | ASF per-class charts (June 2026) | 18,508 |
+| VINCI – Escota | A8 Aix–Menton, A50, A51, A52, A57, A500 | Escota guide | 2,260 |
+| ATMB | A40, A41 nord, B41 | Journal officiel* | 262 |
+| SFTRF | A43 Maurienne | Journal officiel* | 30 |
+| ALIS | A28 Rouen–Alençon | Journal officiel* | 42 |
+| ARCOUR | A19 Artenay–Courtenay | Journal officiel* | 56 |
+| ADELAC | A41 Saint-Julien–Villy-le-Pelloux | Journal officiel* | 6 |
+| A'LIÉNOR | A65 Langon–Pau | Journal officiel* | 82 |
+| ALICORNE | A88 Falaise–Sées | Journal officiel* | 26 |
+| Sanef | A1, A2, A4, A16, A26, A29 | Sanef 2026 grid | 2,734 |
+| SAPN | A13, A29 (incl. A13 free-flow sections) | SAPN 2026 grid | 310 |
+
+\* Arrêté du 28 janvier 2026 (JO du 30 janvier 2026, NOR TRAT2534086A).
+
+### Toll points (paid where they are)
+
+| Point | Pricing | Source |
+|---|---|---|
+| Viaduc de Millau | Summer (15/06–15/09) vs rest of year | Journal officiel + viaduct leaflet |
+| A63 Atlandes: barriers of Saugnac-et-Muret and Castets | Heavy classes A/B/C (axles, PTAC) × Euro class, natural gas | Journal officiel |
+| A150 Albea barrier | Classes 3/4 × Euro 0–7 | Journal officiel |
+| A355 Ittenheim barrier and side station | 26 time bands (weekday, hour, public holidays) × Euro class | Journal officiel + VINCI leaflet |
+| Mont-Blanc tunnel, France→Italy and Italy→France | One-way; trucks Euro 5–6 | ATMB |
+| Fréjus tunnel, France→Italy | One-way; trucks Euro 5–6 | SFTRF |
+| Maurice-Lemaire tunnel | Flat | APRR |
+| Puymorens tunnel | Flat | Légifrance (see below) |
+| Normandie and Tancarville bridges (from 1 May 2026) | Classes 1–4 | CCI Seine Estuaire |
+| A14 Montesson | Base / reduced rate by weekday and hour, public holidays | SAPN grid |
+| A14 Chambourcy | Flat | SAPN grid |
+| Duplex A86 (Rueil, Vaucresson, Vélizy), the 6 directional trips | Half-hour of entry × 5 day types (Mon–Thu, Friday or eve of a public holiday, Saturday, Sunday or public holiday, August working days); toll badge price on trips to Vaucresson | VINCI leaflet |
+| Prado-Carénage and Prado-Sud tunnels (Marseille), each or both in a row | Class 1; Tunnel Pass / Tunnel Pass+ prices by day (7h–20h) and night | Operator's price page (screenshot in `Tools/raw/other/`) |
+| A79 free-flow gantries (Le Montet, Montbeugny, Molinet) | Per gantry or "transit" through both gantries of an interchange; very low emission cars (Crit'Air 0 / electric); trucks by Euro class | ALIAE leaflet |
+
+**A1 time modulation (Sanef):** 122 class 1 trips towards Paris (to Compiègne ouest, Pont-Sainte-Maxence, Senlis and the Chamant barrier) have three official levels: normal, green (vert) and red (rouge). Sanef decides when the green and red periods apply, and that calendar is not in the data. So these trips come back as a green-to-red range unless you pass `sanefA1Period:`.
+
+### Not covered yet
+
+| What | Why |
+|---|---|
+| Motorway subscriptions, discounts, return tickets | Only the public one-way price is modelled. Commuter offers are tied to a registered trip and monthly use, and need each operator's terms. |
+
+## How exactness is checked
+
+`Tools/verify_tariffs.py` runs these checks; the unit tests cover the rest.
+
+- **APRR, AREA, A79:** every fare is rebuilt as text and must match a line of the PDF, one to one.
+- **Cofiroute:** every fare line of the guide is in the data, with nothing extra.
+- **ASF:** the charts are printed twice (per-class files and the guide, with different layouts); both parse to identical cells.
+- **Journal officiel grids:** parsed from the ruled table cells. The page's plain text must then contain exactly the same prices, for every class.
+- **A355:** VINCI's per-station leaflet (half-hour slots × 4 day types × every class and Euro group, 1,760 cells) matches the Journal officiel's time bands minute by minute.
+- **Millau:** the Journal officiel matches the viaduct's own leaflet.
+- **Mont-Blanc and Fréjus:** the France-side prices, from two different operators' pages, are identical.
+- **Sanef / SAPN:** parsed from the table cells; each class page's plain text must contain exactly the same prices. Each column of the A1 time grid is matched to the only Sanef station whose regular fares equal its "normal" prices, and all 122 matched.
+- **A79 gantries:** the leaflet's table is an image, so it is transcribed. The Journal officiel prints the same table as text: 7 of its 9 gantries match on all 14 prices. The first two differ (the JO lists an extra "Deux-Chaises / Ouest" gantry and a 1,20 € Le Montet transit). Ulys bills the leaflet's figures (Montluçon → Mâcon, class 1: 3,30 + 1,00 + 1,90 + 1,30 = 7,50 €), so the leaflet is used. Unit tests also check trips of the leaflet's trip table.
+- **Duplex A86:** each price is read from its table cell, merged cells spanning several half-hours. All 398 values, table by table and row by row, equal the numbers of the page's plain text in the same order.
+- **Across operators:** wherever two grids price the same trip (APRR↔ASF, APRR↔Cofiroute, ASF↔Cofiroute, ALIS↔ASF, ARCOUR↔Cofiroute, A'LIÉNOR↔ASF, A79↔APRR/Cofiroute: about 5,600 trips), they agree to the cent. A unit test checks every shared pair.
+- **VINCI's own summary:** VINCI's "principales liaisons" table and the guides' worked examples match on all classes.
+
+### Interpretation choices
+
+- **Charts:** a price applies in both directions (the charts and Journal officiel triangles print one value per pair).
+- **Shared rows:** a row carrying two station names prices both. Examples: ATMB "Findrol / Scientrier", Escota "St-Cyr / La Cadière".
+- **Blanks:** blank, "-", "x", "." and "---" cells are trips that do not exist.
+- **Toulouse ring:** three free (0 €) ASF links are left out. One chart prints them at 0 €, another as impossible.
+- **A355 holidays:** public holidays are billed like Sundays ("dimanches et jours fériés"), using the order's list, which includes Good Friday and 26 December.
+- **A63 truck classes:** class 3 vehicles are class A up to 12 t PTAC, B above. Class 4 is B with 3 axles, C above.
+- **Undeclared Euro class:** a heavy vehicle without one pays the "non modulé" price where one is published. Where none is, the Euro class is required.
+- **A14 Montesson:** the reduced rate applies "du lundi au vendredi hors jours fériés de 10h à 16h et de 21h à 6h". It is not stated whether the 21h–6h window runs on after Friday night or starts on Sunday night, so on Saturday and Monday 00:00–05:59 the quote is the range between the two rates.
+- **A79 transit:** passing both gantries of an interchange (Ouest then Est, or the reverse) is billed once at the "transit" price, as the leaflet's trip table and Ulys do. Trucks have no price for an undeclared Euro class there, so the quote asks for it.
+- **Duplex A86 day types:** taken from the leaflet's footnotes. "Friday or eve" covers Fridays and Monday–Thursday eves of public holidays, outside August. In August, Monday to Saturday use the August row; Sundays and public holidays use their own row all year. Times after midnight belong to that calendar day. The price is the one at the time given for the trip (the entry time). Holidays follow the usual French list, which matches the leaflet's 2026 dates.
+- **Duplex A86 detection:** each station is a point placed on its OSM toll booth, with no price of its own. Entering at one and leaving at another is replaced by that trip's price. A third station passed in between (a route from Rueil to Vélizy may run close to Vaucresson) is absorbed. The leaflet prints no vehicle class; the tunnel only takes light vehicles under 2 m, so the price is class 1.
+- **Subscriptions:** `Vehicle.subscriptions` lists badges held. Where a toll has a subscriber price for one of them, the quote uses it, otherwise the public price. Deposits and monthly fees are not part of a trip's price. Modelled: any toll badge (Duplex A86), and the Prado Tunnel Pass and Tunnel Pass+.
+- **Prado tunnels:** the page prints one price per tunnel without a vehicle class, so only class 1 is priced. "De 7h à 20h" is read as 07:00–19:59. Taking both tunnels in a row has its own price: 6,20 € (the sum), but 5,80 / 5,40 € for subscribers, 10 or 20 cents more than the sum. The booths of the two tunnels are about 100 m apart at Rabatau, so detecting them from a route still needs a test on a real route.
+- **A1 time grid:** its "normal" prices equal the regular grid, so it is read as trips towards Paris (northern entry, southern exit). The reverse direction uses the regular fare.
+- **Puymorens:** Légifrance also refuses this environment. The five prices were transcribed from its text; classes 1–4 match a second source, class 5 (4,60 €) has only that one.
+
+## Route detection
+
+- **Positions come from OpenStreetMap:** toll booths (`barrier=toll_booth`) or, for stations with no mapped booth, the exit nodes of their interchange on both carriageways (`highway=motorway_junction`). They are matched by name, by road plus exit number, or by exit number near the rest of the grid.
+- **Hand-checked positions (`Tools/pins.py`):** 247 grid entries the matching cannot place: names printed differently from OSM, ASF exits listed without their motorway, barriers named after a place, and stations another grid already places under another name ("same:"). Each was checked against the grid itself: the order of stations in the ASF charts, the cheapest neighbouring trips, and whether a booth is on the main line or on a ramp. Pins also fixed three wrong automatic positions: Cofiroute "ANGERS" (the guide prints it with the other station's exit number, so it had been placed at Ancenis), Cofiroute "CHALONS - LA VEUVE" (55 km off), and the A355 Ittenheim side station (OSM gives the barrier's name to its ramp booths).
+- **Checked against the grids:** `verify_tariffs.py` fails if a fare joins two stations further apart in a straight line than its tariff distance, or costs under 2 cents a kilometre over more than 15 km, or if one name sits in two places.
+- **Tolerances:** a booth counts when the route passes within 35 m of it, an interchange within 80 m.
+- **One place, several names:** the same station named differently in two grids ("AMBERIEU" / "Ambérieu-en-Bugey") is one stop. When names at one place price a trip differently (the A62 plaza north of Toulouse is both "Péage de Toulouse nord/est" and "nord/ouest" in the ASF grid), the route cannot tell which applies: the quote is the range and asks for `.station`; naming the station gives the exact price.
+- **Same name, different places:** ATMB "Saint-Julien" (en-Genevois) and SFTRF "St Julien" (Mont-Denis) normalise to the same key; entries more than 5 km apart are kept as separate stations.
+- **Not on a route:** the open-system marker, concession limits (e.g. ATMB "Chatillon", between Sylans and Bellegarde), borders (ATMB "Genève") and APRR "LUSSE" (the Maurice-Lemaire tunnel, priced by its own toll point) are priced when named but never detected.
+- **Not yet tested on real routes.** Detection has only been checked on synthetic polylines. Use itineraries by station name when the detector misses something.
+
+## Project layout
+
+```
+Package.swift                    TollKit (iOS 17+, macOS 14+, Linux)
+Sources/TollKit/
+  Money.swift                    integer euro cents
+  VehicleClass.swift, Vehicle.swift
+  TollNetwork.swift              one grid: stations, entry → exit fares, toll points
+  TollPoint.swift                barriers/bridges/tunnels: seasons, time bands, Euro classes
+  TollDatabase.swift             all grids; stations merged across grids
+  TollCalculator.swift           quotes: tickets + points, ranges, missing inputs
+  RouteTollDetector.swift        polyline → passages
+  Resources/networks/*.json      generated data (one file per operator)
+Tools/
+  build_tariffs.py               PDFs → JSON, OSM positions
+  vinci_charts.py                reader for ASF/Escota chart PDFs
+  points.py                      toll points (JO annexes, tunnels, bridges, A14)
+  sanef.py                       Sanef / SAPN grids and the A1 time grid
+  verify_tariffs.py              the checks above
+  pins.py                        hand-checked station positions
+  coverage.py                    writes COVERAGE.md
+  raw/                           official source documents
+  data/                          OpenStreetMap snapshots (toll booths, motorway exits)
+android/                         Android port (Gradle): tollkit/ engine in Kotlin, app/ Compose demo
 ```
 
 ## Android
 
-`android/tollkit` is a line-by-line Kotlin port of TollKit. It depends only on the Kotlin standard library and reads the **same** `Sources/TollKit/Resources/networks/*.json` files: nothing is copied, so `Tools/build_tariffs.py` stays the single source of tariffs for both platforms. The Swift unit tests are ported one-to-one in `TollKitTest.kt`.
+`android/tollkit` is a line-by-line Kotlin port of TollKit. It depends only on the Kotlin standard library and reads the **same** `Sources/TollKit/Resources/networks/*.json` files: nothing is copied, so `Tools/build_tariffs.py` stays the single source of tariffs for both platforms. Its tests are in `TollKitTest.kt`.
 
 ```sh
 cd android
@@ -126,34 +205,20 @@ calculator.quote(passages.map { it.station }, VehicleClass.CLASS1)
 
 The demo app covers the "Gares" mode only (pick stations → price). Route mode needs a routing provider on Android (Google Maps, OSRM…); the engine side (`RouteTollDetector`) is ready for it.
 
-## How the price is computed
+**The Kotlin port is behind the Swift engine.** It loads every grid, so closed-system tickets (Sanef and SAPN included) are priced, but it ignores toll points (barriers, bridges, tunnels, Duplex A86, A79 and A14 free-flow), the A1 time modulation (it returns the "normal" price) and the `Vehicle` details. Porting `TollPoint.swift` is the next step for Android.
 
-1. On a route, a toll station counts as crossed when the route passes within 35 m of one of its booths (OpenStreetMap positions). Booths sit on the exit ramps, so a route that only drives past an exit doesn't count it.
-2. The crossed stations are split into the **fewest consecutive tickets that each have a published fare**. A published entry → exit fare is what you pay between those two stations, including any barriers in between.
-3. Each ticket's price is read from the grid for the chosen vehicle class, and the tickets are added up in cents. When two grids list the same pair, their prices must agree exactly (a unit test checks every shared pair).
-
-## How exactness is checked
-
-- **APRR, AREA, A79:** every JSON fare is rebuilt as text and must match a line of the PDF exactly, one to one (`Tools/verify_tariffs.py`).
-- **Cofiroute:** every fare line of the guide must be in the JSON, and the JSON must have nothing extra.
-- **ASF:** ASF publishes its charts twice, as per-class files and in the tariff guide, with different layouts. Both parse to identical cells for all 5 classes. The same reader handles both, so this catches layout mistakes but not a reader bug that affects both.
-- **Across operators:** 5,552 trips are priced by two different operators' documents (APRR↔ASF 1,104, APRR↔Cofiroute 3,382, ASF↔Cofiroute 838, A79↔APRR/Cofiroute 228). They all agree to the cent, and a unit test checks every shared pair.
-- **VINCI's own summary:** the unit tests compare against VINCI's "Tarifs des principales liaisons 2026" table and the guides' worked examples, which are printed separately from the charts. All match for every class.
-- **Escota:** there is only one source, so it is checked only against those summary figures.
-
-## Updating the tariffs (every 1 February, sometimes mid-year: ASF revised its grid on 1 June 2026)
+## Updating the data (every February, plus mid-year revisions)
 
 ```sh
 python3 -m venv .venv && .venv/bin/pip install pdfplumber
-# drop the new PDFs into Tools/raw/ and update URLs/dates in SOURCES
-# (VINCI's download links are in the page data of
-#  https://www.vinci-autoroutes.com/fr/conseils/autoroute-mode-demploi/tarifs-peage-vinci-autoroutes/)
-.venv/bin/python Tools/build_tariffs.py            # or only some grids: … build_tariffs.py asf escota
-.venv/bin/python Tools/verify_tariffs.py   # must print OK for every grid
+# put the new documents in Tools/raw/ and update URLs/dates in build_tariffs.py / points.py
+.venv/bin/python Tools/build_tariffs.py          # or only some grids: … build_tariffs.py asf tmb
+.venv/bin/python Tools/verify_tariffs.py         # every check must pass
+python3 Tools/coverage.py
 swift test
 ```
 
-## Data licences
+## Licences
 
-- Tariffs: published by APRR, AREA, ALIAE and VINCI Autoroutes (ASF, Cofiroute, Escota) (links above).
-- Toll booth positions: © OpenStreetMap contributors, [ODbL 1.0](https://opendatacommons.org/licenses/odbl/). The app must show this attribution before it ships.
+- **Tariffs:** published by the operators (APRR, AREA, ALIAE, VINCI Autoroutes, Sanef, SAPN, ATMB, SFTRF, CEVM, ALIS, ARCOUR, ADELAC, A'LIÉNOR, ALICORNE, ATLANDES, ALBEA, ARCOS, CCI Seine Estuaire) and in the Journal officiel.
+- **Positions:** © OpenStreetMap contributors, [ODbL 1.0](https://opendatacommons.org/licenses/odbl/). Any product showing or redistributing them must credit OpenStreetMap, and the ODbL's share-alike terms apply to derived databases.

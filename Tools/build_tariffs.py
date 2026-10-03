@@ -21,6 +21,9 @@ from pathlib import Path
 
 import pdfplumber
 
+import points as point_tolls
+from pins import PINS
+import sanef
 import vinci_charts
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -38,6 +41,24 @@ ALIASES = {
 CROSS_NETWORK_OPERATORS = ["APRR", "AREA", "COFIROUTE", "SANEF", "ALIAE", "ALICORNE", "ASF", "ARCOUR", "ATMB"]
 
 SOURCES = {
+    "sanef": {"name": "Sanef", "file": "sanef/2026_02-Grille-Sanef.pdf",
+              "url": "https://www.autoroutes.sanef.com/sites/default/files/2026-01/2026_02-Grille-Sanef.pdf",
+              "validFrom": "2026-02-01", "osmOperators": CROSS_NETWORK_OPERATORS + ["SAPN"],
+              "modulationUrl": "https://www.autoroutes.sanef.com/sites/default/files/2026-02/grille-modulee-01022026.pdf"},
+    "sapn": {"name": "SAPN", "file": "sanef/2026_02-Grille-SAPN.pdf",
+             "url": "https://www.autoroutes.sanef.com/sites/default/files/2026-01/2026_02-Grille-SAPN.pdf",
+             "validFrom": "2026-02-01", "osmOperators": CROSS_NETWORK_OPERATORS + ["SAPN"]},
+    **{net_id: {
+        "name": name,
+        "file": "jo/joe_20260130_0025_0037.pdf",
+        "url": "https://www.a63-atlandes.fr/wp-content/uploads/2026/01/joe_20260130_0025_0037.pdf",
+        "validFrom": "2026-02-01",
+        "osmOperators": CROSS_NETWORK_OPERATORS + ["SFTRF", "ALIS", "ADELAC", "A'LIENOR", "ALICORNE", "ARCOUR"],
+    } for net_id, name, _ in [
+        ("atmb", "ATMB (A40, A41 nord, B41)", None), ("sftrf", "SFTRF (A43 Maurienne)", None),
+        ("alis", "ALIS (A28 Rouen–Alençon)", None), ("arcour", "ARCOUR (A19 Artenay–Courtenay)", None),
+        ("adelac", "ADELAC (A41 Saint-Julien–Villy-le-Pelloux)", None),
+        ("alienor", "A'LIÉNOR (A65 Langon–Pau)", None), ("alicorne", "ALICORNE (A88 Falaise–Sées)", None)]},
     "aprr": {
         "name": "APRR",
         "file": "TARIFS_APRR.pdf",
@@ -110,7 +131,8 @@ def dist_m(s: str) -> int:
 
 
 def norm(name: str, strip_peage: bool = True) -> str:
-    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().upper()
+    # "’" would be dropped by the ASCII step, gluing "d’Arles" into "DARLES"
+    s = unicodedata.normalize("NFKD", name.replace("’", "'")).encode("ascii", "ignore").decode().upper()
     if strip_peage:
         s = re.sub(r"\bPEAGE (DE |DU |DES |D'|D’)?", "", s)
     s = re.sub(r"(\bS)?/\s*", " SUR ", s)  # 'BELLEVILLE S/SAONE', 'FONTENAY /LOING'
@@ -198,7 +220,8 @@ def parse_cofiroute(path: Path):
                     sys.exit(f"{path.name}: unparseable row: {line!r}")
                 er, ex, en, xr, xx, xn = m.groups()[:6]
                 prices = [cents(g) for g in m.groups()[6:]]
-                rows.append((en, xn, None if ex == "-" else ex, None if xx == "-" else xx, -1, prices))
+                rows.append((en, xn, None if ex == "-" else f"{er}|{ex}", None if xx == "-" else f"{xr}|{xx}",
+                             -1, prices))
     return rows
 
 
@@ -298,6 +321,137 @@ def parse_charts(net_id, meta):
     return rows
 
 
+JO_FILE = "jo/joe_20260130_0025_0037.pdf"
+JO_URL = "https://www.a63-atlandes.fr/wp-content/uploads/2026/01/joe_20260130_0025_0037.pdf"
+# Journal officiel du 30 janvier 2026, arrêté du 28 janvier 2026 (NOR TRAT2534086A):
+# annex -> (network id, display name, pages holding its five class tables)
+JO_TRIANGLES = {
+    "I": ("atmb", "ATMB (A40, A41 nord, B41)", [3, 4, 5]),
+    "II": ("sftrf", "SFTRF (A43 Maurienne)", [6, 7]),
+    "IV": ("alis", "ALIS (A28 Rouen–Alençon)", [9, 10]),
+    "V": ("arcour", "ARCOUR (A19 Artenay–Courtenay)", [11, 12]),
+    "VI": ("adelac", "ADELAC (A41 Saint-Julien–Villy-le-Pelloux)", [13]),
+    "VII": ("alienor", "A'LIÉNOR (A65 Langon–Pau)", [14, 15, 16]),
+    "VIII": ("alicorne", "ALICORNE (A88 Falaise–Sées)", [17, 18]),
+}
+NUMBER = re.compile(r"^\d+,\d{2}$")
+NO_TRIP = {"", "-", "x", "X"}
+
+
+def _jo_label(cell):
+    """'Mont-\nde-Marsan' -> 'Mont-de-Marsan', 'Savigny\nsur Claris' -> 'Savigny sur Claris'."""
+    out = ""
+    for part in cell.split("\n"):
+        part = part.strip()
+        out += part if out.endswith("-") or not out else " " + part
+    return out
+
+
+def parse_jo_triangle(pages):
+    """Lower-triangle tables: row k holds the prices from station k to the
+    stations of columns 0..k-1, then the station's own name on the diagonal.
+    A row may hold two names (two stations sharing that row's prices, e.g.
+    ATMB 'Findrol' / 'Scientrier'); blank, '-' and 'x' cells mean no trip."""
+    tables, first_names = [], []
+    with pdfplumber.open(RAW / JO_FILE) as pdf:
+        for page_no in pages:
+            page = pdf.pages[page_no]
+            lines = (page.extract_text() or "").splitlines()
+            heads = [i for i, l in enumerate(lines) if l.startswith("Véhicules de classe")]
+            page_tables = page.extract_tables()
+            if len(page_tables) != len(heads):
+                sys.exit(f"JO page {page_no}: {len(page_tables)} tables for {len(heads)} class headings")
+            tables += page_tables
+            first_names += [lines[i + 1].strip() for i in heads]
+    if len(tables) != 5:
+        sys.exit(f"JO pages {pages}: expected 5 class tables, found {len(tables)}")
+
+    per_class = []
+    for table, first in zip(tables, first_names):
+        stations, cells = [], {}
+        for row in table:
+            row = [(c or "").strip() for c in row]
+            labels = [(i, _jo_label(c)) for i, c in enumerate(row) if c and not NUMBER.match(c) and c not in NO_TRIP]
+            if not labels:
+                if not stations and not any(row):
+                    stations.append(first)  # header row whose name sits outside the ruled cell
+                continue
+            if row[0] == "" and not stations and labels[0][0] > 0:
+                stations.append(first)
+            first_label = labels[0][0]
+            if first_label != len(stations):
+                # the first station's name can be printed above the table
+                if not stations and first_label == 1:
+                    stations.append(first)
+                else:
+                    sys.exit(f"JO pages {pages}: label {labels[0][1]!r} in column {first_label}, "
+                             f"expected column {len(stations)}")
+            for offset, (col, name) in enumerate(labels):
+                if col != first_label + offset:
+                    sys.exit(f"JO pages {pages}: labels of one row are not adjacent: {labels}")
+            for _, name in labels:
+                for col in range(first_label):
+                    value = row[col]
+                    if NUMBER.match(value):
+                        cells[(name, stations[col])] = cents(value)
+                    elif value not in NO_TRIP:
+                        sys.exit(f"JO pages {pages}: unreadable cell {value!r}")
+            stations += [name for _, name in labels]
+        per_class.append((stations, cells))
+
+    names = per_class[0][0]
+    for k, (stations, _) in enumerate(per_class[1:], start=2):
+        if stations != names:
+            sys.exit(f"JO pages {pages}: class {k} stations differ: {stations} vs {names}")
+    rows = []
+    for pair in per_class[0][1]:
+        prices = [cells.get(pair) for _, cells in per_class]
+        if None in prices:
+            sys.exit(f"JO pages {pages}: {pair} missing for some classes: {prices}")
+        a, b = pair
+        rows.append((a, b, None, None, -1, prices))
+        rows.append((b, a, None, None, -1, prices))
+    for _, cells in per_class[1:]:
+        if set(cells) != set(per_class[0][1]):
+            sys.exit(f"JO pages {pages}: classes do not price the same trips")
+    return rows
+
+
+def parse_jo_matrix(pages):
+    """SFTRF: upper triangle with a header row of station names."""
+    per_class = []
+    with pdfplumber.open(RAW / JO_FILE) as pdf:
+        for page_no in pages:
+            per_class += pdf.pages[page_no].extract_tables()
+    if len(per_class) != 5:
+        sys.exit(f"JO pages {pages}: expected 5 class tables, found {len(per_class)}")
+    results = []
+    for k, table in enumerate(per_class, start=1):
+        header = [(c or "").strip() for c in table[0]]
+        if header[0] != f"Classe {k}":
+            sys.exit(f"JO pages {pages}: table {k} starts with {header[0]!r}")
+        cols = header[1:]
+        cells = {}
+        for row in table[1:]:
+            row = [(c or "").strip() for c in row]
+            entry = row[0]
+            for j, value in enumerate(row[1:]):
+                if NUMBER.match(value):
+                    cells[(entry, cols[j])] = cents(value)
+                elif value not in NO_TRIP:
+                    sys.exit(f"JO pages {pages}: unreadable cell {value!r}")
+        results.append(cells)
+    rows = []
+    for pair in results[0]:
+        prices = [cells.get(pair) for cells in results]
+        if None in prices or any(set(c) != set(results[0]) for c in results):
+            sys.exit(f"JO pages {pages}: classes do not price the same trips")
+        a, b = pair
+        rows.append((a, b, None, None, -1, prices))
+        rows.append((b, a, None, None, -1, prices))
+    return rows
+
+
 def load_osm():
     return json.loads(OSM.read_text())["elements"]
 
@@ -347,14 +501,221 @@ def locate(stations, osm, operators, match_codes=False):
 
 def app_key(name: str) -> str:
     """Same normalisation as StationName.key in TollKit."""
-    s = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().upper()
+    s = unicodedata.normalize("NFKD", name.replace("’", "'")).encode("ascii", "ignore").decode().upper()
     s = re.sub(r"(\bS)?/\s*", " SUR ", s)
     s = re.sub(r"\bCH\.", "CHATEAU ", s)
     s = s.replace("SAINTE", "STE").replace("SAINT", "ST")
     return " ".join(re.sub(r"[^A-Z0-9]+", " ", s).split())
 
 
-def build(net_id, meta, rows, osm):
+JUNCTIONS = ROOT / "Tools" / "data" / "osm_motorway_junctions.json"
+# Grid entries that are not a place you can enter or leave the motorway:
+# concession limits, motorway forks, the open-system marker, the border.
+VIRTUAL = re.compile(r"limite de concession|LIM\.? ?CONC|bifurcation|syst[eè]me ouvert|fronti[eè]re", re.I)
+_junctions = None
+
+
+def _km(a, b):
+    import math
+    dlat = math.radians(b[0] - a[0])
+    dlon = math.radians(b[1] - a[1]) * math.cos(math.radians((a[0] + b[0]) / 2))
+    return 6371 * math.hypot(dlat, dlon)
+
+
+def _clusters(nodes, radius_km=3):
+    """Group junction nodes of one interchange (both carriageways, all ramps)."""
+    groups = []
+    for n in nodes:
+        for g in groups:
+            if any(_km((n["lat"], n["lon"]), (m["lat"], m["lon"])) < radius_km for m in g):
+                g.append(n)
+                break
+        else:
+            groups.append([n])
+    return groups
+
+
+def _ref_key(ref):
+    return re.sub(r"[\s.\-]+", ".", ref.strip().lower())
+
+
+def _resolve_pin(net_id, name, ref, junctions, booths, booth_ids):
+    """One pin reference -> (points, kind)."""
+    if isinstance(ref, list):
+        return [ref], "junctions"
+    if ref.startswith("booth:"):
+        found = booths.get(ref[6:], [])
+        if not found:
+            sys.exit(f"{net_id}: no OSM booth named {ref[6:]!r}")
+        return [[e["lat"], e["lon"]] for e in found], "booths"
+    if ref.startswith("exit:"):
+        # "exit:A10:44" -> the interchange with that number on that road; it must
+        # be unique, or "exit:A10:44@lat,lon" picks the one nearest that point
+        spec, _, near = ref[5:].partition("@")
+        road, _, number = spec.partition(":")
+        nodes = [j for j in junctions.values()
+                 if road in [r.replace(" ", "") for r in j.get("roads") or []]
+                 and j.get("ref") and _ref_key(j["ref"]) == _ref_key(number)]
+        groups = _clusters(nodes)
+        if near:
+            here = tuple(map(float, near.split(",")))
+            groups = sorted(groups, key=lambda g: min(_km(here, (n["lat"], n["lon"])) for n in g))[:1]
+            if groups and min(_km(here, (n["lat"], n["lon"])) for n in groups[0]) > 15:
+                sys.exit(f"{net_id}: {name}: {ref} is more than 15 km from the hint")
+        if len(groups) != 1:
+            sys.exit(f"{net_id}: {name}: {ref} matches {len(groups)} interchanges")
+        return [[n["lat"], n["lon"]] for n in groups[0]], "junctions"
+    if ref in booth_ids and ref not in junctions:
+        return [[booth_ids[ref]["lat"], booth_ids[ref]["lon"]]], "booths"
+    if ref not in junctions:
+        sys.exit(f"{net_id}: {name}: unknown OSM node {ref}")
+    return [[junctions[ref]["lat"], junctions[ref]["lon"]]], "junctions"
+
+
+def apply_pins(net_id, stations, osm):
+    """Hand-checked positions (Tools/pins.py). They override the automatic
+    ones. "same:" pins are applied once every grid is built (apply_same_as)."""
+    pins = PINS.get(net_id, {})
+    if not pins:
+        return
+    junctions = {j["osm"]: j for j in json.loads(JUNCTIONS.read_text())["elements"]}
+    booths, booth_ids = {}, {e["osm"]: e for e in osm}
+    for e in osm:
+        if e.get("name"):
+            booths.setdefault(e["name"], []).append(e)
+    by_name = {s["name"]: s for s in stations}
+    for name, refs in pins.items():
+        s = by_name.get(name)
+        if s is None:
+            sys.exit(f"{net_id}: pinned station {name!r} is not in the grid")
+        for k in ("lat", "lon", "booths", "junctions", "virtual"):
+            s.pop(k, None)
+        if refs == "virtual" or (isinstance(refs, tuple) and refs[0] == "virtual"):
+            s["virtual"] = True
+            continue
+        if isinstance(refs, str) and refs.startswith("same:"):
+            continue
+        points, kind = [], "junctions"
+        for ref in refs:
+            found, k = _resolve_pin(net_id, name, ref, junctions, booths, booth_ids)
+            points += found
+            kind = "booths" if k == "booths" else kind
+        s[kind] = points
+        s["lat"] = round(sum(p[0] for p in points) / len(points), 6)
+        s["lon"] = round(sum(p[1] for p in points) / len(points), 6)
+        s["pinned"] = True
+
+
+def apply_same_as(net_ids):
+    """Copy positions for "same:<grid>:<name>" pins: a station another grid
+    names differently (e.g. APRR "REIMS EST (TAISSY)" = Sanef "REIMS EST
+    (péage de Taissy)")."""
+    docs = {p.stem: json.loads(p.read_text()) for p in OUT.glob("*.json")}
+    for net_id in net_ids:
+        changed = False
+        for name, refs in PINS.get(net_id, {}).items():
+            if not (isinstance(refs, str) and refs.startswith("same:")):
+                continue
+            src_net, _, src_name = refs[5:].partition(":")
+            src = next((s for s in docs[src_net]["stations"] if s["name"] == src_name), None)
+            if src is None or "lat" not in src:
+                sys.exit(f"{net_id}: {name}: {refs} is not a located station")
+            s = next(s for s in docs[net_id]["stations"] if s["name"] == name)
+            for k in ("lat", "lon", "booths", "junctions"):
+                s.pop(k, None)
+                if k in src:
+                    s[k] = src[k]
+            changed = True
+        if changed:
+            (OUT / f"{net_id}.json").write_text(json.dumps(docs[net_id], ensure_ascii=False, separators=(",", ":")))
+
+
+def locate_junctions(net_id, stations):
+    """Place stations that have no toll booth in OSM at their interchange
+    (highway=motorway_junction nodes of both carriageways):
+      1. road + exit number (grids that print the road, e.g. Cofiroute),
+      2. exact name, if it resolves to a single interchange near the network,
+      3. exit number alone, if a single interchange with that number lies
+         within 20 km of an already located station of the same grid
+         (repeated until nothing changes).
+    Anything ambiguous stays unlocated."""
+    global _junctions
+    if _junctions is None:
+        _junctions = json.loads(JUNCTIONS.read_text())["elements"]
+    by_name, by_road_ref, by_ref = {}, {}, {}
+    for j in _junctions:
+        if j.get("name"):
+            by_name.setdefault(norm(j["name"]), []).append(j)
+        if j.get("ref"):
+            by_ref.setdefault(_ref_key(j["ref"]), []).append(j)
+            for road in j.get("roads", []):
+                by_road_ref.setdefault((road, _ref_key(j["ref"])), []).append(j)
+
+    def located():
+        return [(s["lat"], s["lon"]) for s in stations if "lat" in s]
+
+    def near_network(cluster, radius):
+        anchors = located()
+        c = cluster[0]
+        return not anchors or min(_km((c["lat"], c["lon"]), a) for a in anchors) < radius
+
+    used = set()
+
+    def place(s, cluster, how):
+        used.update(j["osm"] for j in cluster)
+        s["junctions"] = [[j["lat"], j["lon"]] for j in cluster]
+        s["lat"] = round(sum(j["lat"] for j in cluster) / len(cluster), 6)
+        s["lon"] = round(sum(j["lon"] for j in cluster) / len(cluster), 6)
+        counts[how] += 1
+
+    counts = {"road+exit": 0, "name": 0, "exit near grid": 0}
+    todo = []
+    for s in stations:
+        if VIRTUAL.search(s["name"]):
+            s["virtual"] = True
+        elif "lat" not in s:
+            todo.append(s)
+    for s in list(todo):
+        if s.get("road") and s.get("code"):
+            # a grid may give the section's motorways ("A13,A29"): the exit number
+            # must then identify a single interchange across all of them
+            nodes = [j for road in s["road"].split(",")
+                     for j in by_road_ref.get((road.replace(" ", ""), _ref_key(s["code"])), [])]
+            groups = _clusters(nodes)
+            if len(groups) == 1:
+                place(s, groups[0], "road+exit")
+                todo.remove(s)
+    def bare(name):
+        return norm(re.sub(r"\s*\(sortie [^)]*\)", "", name), strip_peage=False)
+
+    repeated = {n for n in (bare(s["name"]) for s in stations) if sum(bare(t["name"]) == n for t in stations) > 1}
+    for s in list(todo):
+        # A barrier ("Péage de X") is on the main road, not at exit X; and
+        # names shared by several stations can only be told apart by exit number.
+        if re.match(r"p[ée]age\b", s["name"], re.I) or bare(s["name"]) in repeated:
+            continue
+        groups = [g for g in _clusters(by_name.get(bare(s["name"]), []))
+                  if near_network(g, 150) and not used & {j["osm"] for j in g}]
+        if len(groups) == 1:
+            place(s, groups[0], "name")
+            todo.remove(s)
+    changed = True
+    while changed:
+        changed = False
+        for s in list(todo):
+            if not s.get("code"):
+                continue
+            groups = [g for g in _clusters(by_ref.get(_ref_key(s["code"]), []))
+                      if located() and near_network(g, 20) and not used & {j["osm"] for j in g}]
+            if len(groups) == 1:
+                place(s, groups[0], "exit near grid")
+                todo.remove(s)
+                changed = True
+    if any(counts.values()):
+        print(f"  {net_id}: placed at interchanges by " + ", ".join(f"{k} {v}" for k, v in counts.items() if v))
+
+
+def build(net_id, meta, rows, osm, modulations=None):
     # one spelling per station ("VILLEFRANCHE NORD" / "VILLEFRANCHE-NORD")
     spelling = {}
     for en, xn, *_ in rows:
@@ -366,9 +727,19 @@ def build(net_id, meta, rows, osm):
     for en, xn, ec, xc, *_ in rows:
         names.setdefault(en, ec)
         names.setdefault(xn, xc)
-    stations = [{"id": f"{net_id}:{n}", "name": n, **({"code": c} if c else {})} for n, c in sorted(names.items())]
+    stations = []
+    for n, c in sorted(names.items()):
+        station = {"id": f"{net_id}:{n}", "name": n}
+        if c:
+            road, _, code = c.rpartition("|")
+            station["code"] = code
+            if road:
+                station["road"] = road
+        stations.append(station)
     index = {s["name"]: i for i, s in enumerate(stations)}
     locate(stations, osm, set(meta["osmOperators"]), meta.get("matchCodes", False))
+    apply_pins(net_id, stations, osm)
+    locate_junctions(net_id, stations)
     fares, seen = [], {}
     for en, xn, _, _, d, prices in rows:
         key = (index[en], index[xn])
@@ -379,6 +750,15 @@ def build(net_id, meta, rows, osm):
         seen[key] = (d, prices)
         fares.append([key[0], key[1], d, *prices])
     located = sum(1 for s in stations if "lat" in s)
+    for s in stations:
+        s.pop("road", None)
+    # time-modulated class 1 fares: [entry, exit, normal, green, red]
+    mods = []
+    for entry, exit_, levels in modulations or []:
+        e, x = index[spelling[app_key(entry)]], index[spelling[app_key(exit_)]]
+        if seen[(e, x)][1][0] != levels["normal"]:
+            sys.exit(f"{net_id}: modulation {entry} -> {exit_} does not match the grid")
+        mods.append([e, x, levels["normal"], levels["green"], levels["red"]])
     doc = {
         "id": net_id,
         "name": meta["name"],
@@ -388,12 +768,42 @@ def build(net_id, meta, rows, osm):
         "fareColumns": ["entry", "exit", "distanceMeters", "class1", "class2", "class3", "class4", "class5"],
         "stations": stations,
         "fares": fares,
+        **({"class1Modulations": mods, "modulationSource": meta["modulationUrl"]} if mods else {}),
     }
     OUT.mkdir(parents=True, exist_ok=True)
     with open(OUT / f"{net_id}.json", "w") as f:
         json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))
     print(f"{net_id}: {len(stations)} stations ({located} located), {len(fares)} fares")
 
+
+
+def build_points(net_id, osm):
+    """Networks made of point tolls only (barriers, bridges)."""
+    name, make = point_tolls.POINT_NETWORKS[net_id]
+    by_name = {}
+    for e in osm:
+        if e.get("name"):
+            by_name.setdefault(e["name"], []).append(e)
+    out = []
+    for p in make():
+        booths = p.get("booths") or [[e["lat"], e["lon"]] for n in p.get("osm", []) for e in by_name.get(n, [])]
+        point = {"id": f"{net_id}:{p['name']}", "name": p["name"], "kind": p["kind"], "tariff": p["tariff"]}
+        if p.get("combines"):
+            point["combines"] = p["combines"]
+        if p.get("combinesInOrder"):
+            point["combinesInOrder"] = True
+        if booths:
+            point["lat"] = round(sum(b[0] for b in booths) / len(booths), 6)
+            point["lon"] = round(sum(b[1] for b in booths) / len(booths), 6)
+            point["booths"] = booths
+        out.append(point)
+    valid_from, source = point_tolls.POINT_SOURCES[net_id]
+    doc = {"id": net_id, "name": name, "validFrom": valid_from, "source": source, "currency": "EUR",
+           "fareColumns": ["entry", "exit", "distanceMeters", "class1", "class2", "class3", "class4", "class5"],
+           "stations": [], "fares": [], "points": out}
+    with open(OUT / f"{net_id}.json", "w") as f:
+        json.dump(doc, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"{net_id}: {len(out)} toll points ({sum('booths' in p for p in out)} located)")
 
 def main():
     """Build every grid, or only the ids given on the command line."""
@@ -405,9 +815,22 @@ def main():
         "cofiroute": lambda: parse_cofiroute(RAW / SOURCES["cofiroute"]["file"]),
         "asf": lambda: parse_charts("asf", SOURCES["asf"]),
         "escota": lambda: parse_charts("escota", SOURCES["escota"]),
+        "sftrf": lambda: parse_jo_matrix([6, 7]),
+        "sanef": lambda: sanef.parse_grid("2026_02-Grille-Sanef.pdf"),  # A1 modulation added below
+        "sapn": lambda: sanef.parse_grid("2026_02-Grille-SAPN.pdf"),
+        **{net_id: (lambda pages=pages: parse_jo_triangle(pages))
+           for annex, (net_id, _, pages) in JO_TRIANGLES.items() if net_id != "sftrf"},
     }
-    for net_id in sys.argv[1:] or parsers:
-        build(net_id, SOURCES[net_id], parsers[net_id](), osm)
+    net_ids = sys.argv[1:] or [*parsers, *point_tolls.POINT_NETWORKS]
+    for net_id in net_ids:
+        if net_id in point_tolls.POINT_NETWORKS:
+            build_points(net_id, osm)
+        elif net_id == "sanef":
+            rows = parsers[net_id]()
+            build(net_id, SOURCES[net_id], rows, osm, sanef.parse_a1_modulation(rows))
+        else:
+            build(net_id, SOURCES[net_id], parsers[net_id](), osm)
+    apply_same_as([n for n in net_ids if n in parsers])
 
 
 if __name__ == "__main__":

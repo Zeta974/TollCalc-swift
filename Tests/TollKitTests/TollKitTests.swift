@@ -17,7 +17,13 @@ final class TollKitTests: XCTestCase {
         XCTAssertEqual(byID["asf"]?.fareCount, 18_508)
         XCTAssertEqual(byID["escota"]?.fareCount, 2_260)
         XCTAssertEqual(byID["asf"]?.validFrom, "2026-06-01")  // ASF revised its grid on 1 June 2026
-        XCTAssertTrue(database.networks.filter { $0.id != "asf" }.allSatisfy { $0.validFrom == "2026-02-01" })
+        // Alpine tunnels and the Duplex A86 change on 1 January, the Seine bridges changed on 1 May 2026.
+        // The Prado tunnels' page gives no start date: it is the day it was read.
+        let exceptions = ["asf": "2026-06-01", "tmb": "2026-01-01", "frejus": "2026-01-01", "ponts-seine": "2026-05-01",
+                          "prado": "2026-10-01", "duplex-a86": "2026-01-01"]
+        for network in database.networks {
+            XCTAssertEqual(network.validFrom, exceptions[network.id] ?? "2026-02-01", network.id)
+        }
     }
 
     // MARK: - Prices copied from the official PDFs (1 February 2026)
@@ -64,7 +70,7 @@ final class TollKitTests: XCTestCase {
                                   network: String, file: StaticString = #filePath, line: UInt = #line) throws {
         for (vehicleClass, expected) in zip(VehicleClass.allCases, euros) {
             let quote = try calculator.quote(from: entry, to: exit, vehicleClass: vehicleClass)
-            XCTAssertEqual(quote.total.formatted, expected, "\(entry) → \(exit) \(vehicleClass)", file: file, line: line)
+            XCTAssertEqual(quote.total?.formatted, expected, "\(entry) → \(exit) \(vehicleClass)", file: file, line: line)
             XCTAssertEqual(quote.lines.first?.networkID, network, file: file, line: line)
         }
     }
@@ -89,7 +95,7 @@ final class TollKitTests: XCTestCase {
         try assertAllClasses("Aix (A51)", "La Saulce",
                              ["14,90 €", "20,60 €", "28,90 €", "42,00 €", "8,70 €"], network: "escota")
         // Guide example: "La Saulce > Peyruis = 5,70 €"
-        XCTAssertEqual(try calculator.quote(from: "La Saulce", to: "Peyruis", vehicleClass: .class1).total.formatted,
+        XCTAssertEqual(try calculator.quote(from: "La Saulce", to: "Peyruis", vehicleClass: .class1).total?.formatted,
                        "5,70 €")
     }
 
@@ -165,7 +171,7 @@ final class TollKitTests: XCTestCase {
 
     func testItineraryPrefersSinglePublishedTicket() throws {
         let stops = try ["ALLAINES", "AUXERRE NORD", "AMBERIEU"].map(station)
-        let quote = calculator.quote(TollItinerary(stops: stops, vehicleClass: .class1))
+        let quote = calculator.quote(TollItinerary(stops: stops.map(TollStop.station)))
         // ALLAINES → AMBERIEU is published as one ticket, so AUXERRE NORD is a drive-by.
         XCTAssertEqual(quote.lines.count, 1)
         XCTAssertEqual(quote.total, Money(cents: 5820))
@@ -174,11 +180,12 @@ final class TollKitTests: XCTestCase {
     func testItinerarySplitsWhenNoSingleTicketExists() throws {
         // Leave APRR at AMBERIEU, then later use the AREA network on its own.
         let stops = try ["ALLAINES", "AMBERIEU", "AIGUEBELETTE", "AIX NORD"].map(station)
-        let quote = calculator.quote(TollItinerary(stops: stops, vehicleClass: .class1))
-        XCTAssertEqual(quote.lines.map(\.exit.name), ["AMBERIEU", "AIGUEBELETTE", "AIX NORD"])
+        let quote = calculator.quote(TollItinerary(stops: stops.map(TollStop.station)))
+        XCTAssertEqual(quote.lines.map(\.exit?.name), ["AMBERIEU", "AIGUEBELETTE", "AIX NORD"])
         XCTAssertFalse(quote.isComplete, "AMBERIEU → AIGUEBELETTE is not a published ticket")
         XCTAssertEqual(quote.unpricedLines.count, 1)
-        XCTAssertEqual(quote.total, Money(cents: 5820 + 350))
+        XCTAssertNil(quote.total, "an incomplete quote has no exact total")
+        XCTAssertEqual(quote.totalRange.min, Money(cents: 5820 + 350))
     }
 
     // MARK: - Route detection
@@ -196,9 +203,10 @@ final class TollKitTests: XCTestCase {
         ]
         let detector = RouteTollDetector(database: database)
         let passages = detector.passages(along: route)
-        XCTAssertEqual(passages.first?.station.key, "ALLAINES")
-        XCTAssertEqual(passages.last?.station.key, "AMBERIEU")
-        let quote = calculator.quote(passages: passages.map(\.station), vehicleClass: .class1)
+        XCTAssertEqual(passages.first?.stop.key, "ALLAINES")
+        // Other grids call the same interchange "Ambérieu-en-Bugey"; both are detected.
+        XCTAssertTrue(["AMBERIEU", "AMBERIEU EN BUGEY"].contains(passages.last?.stop.key ?? ""))
+        let quote = calculator.quote(stops: passages.map(\.stop), vehicle: Vehicle(.class1))
         XCTAssertEqual(quote.total, Money(cents: 5820))
     }
 
@@ -208,7 +216,7 @@ final class TollKitTests: XCTestCase {
         let offset = 200 / (111_320 * cos(booth.latitude * .pi / 180))
         let route = [GeoPoint(latitude: booth.latitude - 0.01, longitude: booth.longitude + offset),
                      GeoPoint(latitude: booth.latitude + 0.01, longitude: booth.longitude + offset)]
-        XCTAssertFalse(RouteTollDetector(database: database).passages(along: route).contains { $0.station.key == "ALLAINES" })
+        XCTAssertFalse(RouteTollDetector(database: database).passages(along: route).contains { $0.stop.key == "ALLAINES" })
     }
 
     func testGeoDistance() {
