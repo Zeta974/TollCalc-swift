@@ -174,6 +174,7 @@ Tools/
   coverage.py                    writes COVERAGE.md
   raw/                           official source documents
   data/                          OpenStreetMap snapshots (toll booths, motorway exits)
+android/                         Android port (Gradle): tollkit/ engine in Kotlin, app/ Compose demo
 ```
 
 ## Android
