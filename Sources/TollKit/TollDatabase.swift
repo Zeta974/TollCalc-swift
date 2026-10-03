@@ -9,27 +9,61 @@ public struct TollDatabase: Sendable {
     public let networks: [TollNetwork]
     /// One entry per physical station, sorted by name, booths merged across grids.
     public let stations: [TollStation]
+    /// Every barrier, bridge or section priced on its own.
+    public let points: [TollPoint]
     private let stationsByKey: [String: TollStation]
+    private let pointsByKey: [String: TollPoint]
+    /// Points that replace two consecutive points (`TollPoint.combines`).
+    private let combinedPoints: [[String]: TollPoint]
 
     public init(networks: [TollNetwork]) {
         self.networks = networks
         var merged: [String: TollStation] = [:]
+        // Same name, different places (ATMB "Saint-Julien" en-Genevois and SFTRF
+        // "St Julien" Mont-Denis): kept apart.
+        var homonyms: [TollStation] = []
         for network in networks {
             for station in network.stations {
-                if let existing = merged[station.key] {
+                if let existing = merged[station.key], let a = existing.location, let b = station.location,
+                   Geo.distance(a, b) > Self.homonymDistance {
+                    homonyms.append(station)
+                } else if let existing = merged[station.key] {
                     let booths = existing.booths + station.booths.filter { !existing.booths.contains($0) }
+                    let junctions = existing.junctions + station.junctions.filter { !existing.junctions.contains($0) }
+                    // Prefer a booth position over an interchange position.
+                    let location = existing.booths.isEmpty && !station.booths.isEmpty
+                        ? station.location : (existing.location ?? station.location)
                     merged[station.key] = TollStation(
                         id: existing.id, name: existing.name, code: existing.code ?? station.code,
-                        networkID: existing.networkID, location: existing.location ?? station.location,
-                        booths: booths)
+                        networkID: existing.networkID, location: location,
+                        booths: booths, junctions: junctions, isVirtual: existing.isVirtual && station.isVirtual)
                 } else {
                     merged[station.key] = station
                 }
             }
         }
         stationsByKey = merged
-        stations = merged.values.sorted { $0.name < $1.name }
+        stations = (Array(merged.values) + homonyms).sorted { $0.name < $1.name }
+        points = networks.flatMap(\.points).sorted { $0.name < $1.name }
+        pointsByKey = Dictionary(points.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
+        var combined: [[String]: TollPoint] = [:]
+        for point in points where point.combines.count == 2 {
+            combined[point.combines] = combined[point.combines] ?? point
+            if !point.combinesInOrder {
+                combined[point.combines.reversed()] = combined[point.combines.reversed()] ?? point
+            }
+        }
+        combinedPoints = combined
     }
+
+    /// The point billed instead of passing `a` then `b`, if any.
+    public func combined(_ a: TollPoint, _ b: TollPoint) -> TollPoint? {
+        combinedPoints[[a.id, b.id]]
+    }
+
+    /// Entries of different grids with the same name are one station unless
+    /// they are further apart than this.
+    static let homonymDistance = 5_000.0
 
     /// Loads the grids bundled with TollKit (`Resources/networks/*.json`).
     public static func bundled() throws -> TollDatabase {
@@ -46,6 +80,22 @@ public struct TollDatabase: Sendable {
 
     public func station(named name: String) -> TollStation? {
         stationsByKey[StationName.key(name)]
+    }
+
+    public func point(named name: String) -> TollPoint? {
+        pointsByKey[StationName.key(name)]
+    }
+
+    /// A station or a toll point with this name.
+    public func stop(named name: String) -> TollStop? {
+        station(named: name).map(TollStop.station) ?? point(named: name).map(TollStop.point)
+    }
+
+    /// Stations and toll points whose name contains every word of `query`.
+    public func searchStops(_ query: String) -> [TollStop] {
+        let words = StationName.key(query).split(separator: " ")
+        let stops = stations.map(TollStop.station) + points.map(TollStop.point)
+        return stops.filter { stop in words.allSatisfy { stop.key.contains($0) } }
     }
 
     /// Stations whose name contains every word of `query` (accent/case insensitive).

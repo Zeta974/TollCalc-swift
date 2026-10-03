@@ -30,8 +30,11 @@ class TollKitTest {
         assertEquals(11_004, byID["cofiroute"]?.fareCount)
         assertEquals(18_508, byID["asf"]?.fareCount)
         assertEquals(2_260, byID["escota"]?.fareCount)
+        assertEquals(2_734, byID["sanef"]?.fareCount)
+        assertEquals(310, byID["sapn"]?.fareCount)
         assertEquals("2026-06-01", byID["asf"]?.validFrom) // ASF revised its grid on 1 June 2026
-        assertTrue(database.networks.filter { it.id != "asf" }.all { it.validFrom == "2026-02-01" })
+        // Grids with tickets; toll-point files (tunnels, bridges, Duplex…) have their own dates
+        assertTrue(database.networks.filter { it.fareCount > 0 && it.id != "asf" }.all { it.validFrom == "2026-02-01" })
     }
 
     // MARK: - Prices copied from the official PDFs (1 February 2026)
