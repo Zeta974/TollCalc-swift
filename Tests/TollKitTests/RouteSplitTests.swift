@@ -60,4 +60,23 @@ final class RouteSplitTests: XCTestCase {
                                      vehicle: Vehicle(.class1), plazasAreStops: true)
         XCTAssertNil(route.total)
     }
+
+    func testRealRouteTretsToCapbreton() throws {
+        // A real route (OSRM over OpenStreetMap, 719 km). Ulys bills 67,20 €:
+        // Canet 1,00, Lançon → St-Martin-de-Crau 5,20, Arles → Toulouse sud-ouest
+        // 34,80, Muret 1,80, Lestelle → Sames 22,40, Capbreton 2,00.
+        let url = try XCTUnwrap(Bundle.module.url(forResource: "Resources/route-trets-capbreton", withExtension: "json"))
+        struct Fixture: Decodable { let points: [[Double]] }
+        let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: url))
+        let route = fixture.points.map { GeoPoint(latitude: $0[0], longitude: $0[1]) }
+        let (passages, quote) = calculator.quote(route: route, vehicle: Vehicle(.class1))
+        let prices = quote.lines.compactMap(\.price)
+        XCTAssertEqual(prices.map(\.cents), [100, 520, 3480, 180, 2240, 200])
+        XCTAssertEqual(prices.reduce(Money(cents: 0), +), Money(cents: 6720))
+        // Plazas the route goes through are stops; exit plazas beside the road
+        // (Salon sud, St-Jean-de-Védas, Guiche: 20–35 m away) are not.
+        let stops = passages.filter(\.isThroughPlaza).map(\.stop.name)
+        XCTAssertTrue(stops.contains("Péage de Muret") && stops.contains("Péage de Lestelle") && stops.contains("Péage de Sames"))
+        XCTAssertFalse(stops.contains("Salon sud") || stops.contains("St-Jean-de-Védas") || stops.contains("Guiche"))
+    }
 }

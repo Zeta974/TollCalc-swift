@@ -9,6 +9,14 @@ public struct TollPassage: Sendable, Hashable {
     public let offset: Double
 
     public var station: TollStation? { stop.station }
+
+    /// The route goes through the station's toll plaza (it passes over a
+    /// booth), so the driver stops there. A plaza beside the road (an exit's
+    /// ramp booths a few tens of metres from the main line) is only driven past.
+    public var isThroughPlaza: Bool { !stop.booths.isEmpty && offset <= Self.plazaOffset }
+
+    /// Booths are mapped on the lane the route follows: real stops measure 0–2 m.
+    public static let plazaOffset = 10.0
 }
 
 /// Finds the stations and toll points a route polyline goes through, in
@@ -83,7 +91,15 @@ extension TollCalculator {
     public func quote(route: [GeoPoint], vehicle: Vehicle, date: Date? = nil, sanefA1Period: SanefA1Period? = nil,
                       detector: RouteTollDetector? = nil) -> (passages: [TollPassage], quote: TollQuote) {
         let passages = (detector ?? RouteTollDetector(database: database)).passages(along: route)
-        return (passages, quote(stops: passages.map(\.stop), vehicle: vehicle, date: date, sanefA1Period: sanefA1Period,
-                                plazasAreStops: true))
+        return (passages, quote(passages: passages, vehicle: vehicle, date: date, sanefA1Period: sanefA1Period))
+    }
+
+    /// Price the passages of a route: tickets change at every plaza the
+    /// route goes through (`TollPassage.isThroughPlaza`).
+    public func quote(passages: [TollPassage], vehicle: Vehicle, date: Date? = nil,
+                      sanefA1Period: SanefA1Period? = nil) -> TollQuote {
+        let plazas = Set(passages.filter(\.isThroughPlaza).compactMap { $0.station?.id })
+        return quote(stops: passages.map(\.stop), vehicle: vehicle, date: date, sanefA1Period: sanefA1Period,
+                     plazaStops: plazas)
     }
 }

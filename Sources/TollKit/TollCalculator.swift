@@ -200,18 +200,26 @@ public struct TollCalculator: Sendable {
     /// never estimated. `date` is the time of the trip, used by seasonal and
     /// time-of-day prices; without it those come back as ranges.
     ///
-    /// `plazasAreStops`: the stops come from a route (`RouteTollDetector`), so
-    /// a station found at its toll booths was driven through, and tickets
-    /// change there (see `tickets`). Leave it off for itineraries named by
-    /// hand, where a station in the middle is a waypoint that may be driven past.
+    /// `plazasAreStops`: every station with toll booths in `stops` was driven
+    /// through, so tickets change there (see `tickets`). Leave it off for
+    /// itineraries named by hand, where a station in the middle is a waypoint
+    /// that may be driven past. For a route, use `quote(route:)` or
+    /// `quote(passages:)`, which know which plazas the route went through.
     public func quote(stops: [TollStop], vehicle: Vehicle, date: Date? = nil,
                       sanefA1Period: SanefA1Period? = nil, plazasAreStops: Bool = false) -> TollQuote {
+        let plazas = plazasAreStops ? Set(stops.compactMap { $0.station }.filter { !$0.booths.isEmpty }.map(\.id)) : []
+        return quote(stops: stops, vehicle: vehicle, date: date, sanefA1Period: sanefA1Period, plazaStops: plazas)
+    }
+
+    /// `plazaStops`: ids of the stations whose plaza the trip goes through.
+    func quote(stops: [TollStop], vehicle: Vehicle, date: Date?, sanefA1Period: SanefA1Period?,
+               plazaStops: Set<String>) -> TollQuote {
         let stops = mergingCombinedPoints(stops)
         var lines: [TollQuote.Line] = []
         var run: [TollStation] = []
         func flush() {
             lines += tickets(for: run, vehicleClass: vehicle.vehicleClass, sanefA1Period: sanefA1Period,
-                             plazasAreStops: plazasAreStops)
+                             plazaStops: plazaStops)
             run = []
         }
         for stop in stops {
@@ -311,7 +319,7 @@ public struct TollCalculator: Sendable {
 
     /// Fewest consecutive published tickets covering `stations`.
     ///
-    /// On a route (`plazasAreStops`), a station reached at its toll booths is a stop: the driver pays or
+    /// A station whose plaza the route goes through (`plazaStops`) is a stop: the driver pays or
     /// takes a ticket there (a main-line barrier, or the plaza of an exit
     /// actually used). A ticket may not run through such a stop, because grids
     /// also publish fares for other paths between the same two stations (ASF
@@ -323,10 +331,10 @@ public struct TollCalculator: Sendable {
     /// Stations found only by their interchange can be driven past, so they
     /// never split a ticket.
     private func tickets(for stations: [TollStation], vehicleClass: VehicleClass,
-                         sanefA1Period: SanefA1Period?, plazasAreStops: Bool) -> [TollQuote.Line] {
+                         sanefA1Period: SanefA1Period?, plazaStops: Set<String>) -> [TollQuote.Line] {
         let path = group(stations)
         guard path.count >= 2 else { return [] }
-        let isStop = path.map { group in plazasAreStops && group.contains { !$0.booths.isEmpty } }
+        let isStop = path.map { group in group.contains { plazaStops.contains($0.id) } }
         var cache: [Int: TollQuote.Line?] = [:]
         func priced(_ i: Int, _ j: Int) -> TollQuote.Line? {
             let key = i * path.count + j
