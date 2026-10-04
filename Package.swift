@@ -15,7 +15,8 @@ let package = Package(
         ),
         .testTarget(
             name: "TollKitTests",
-            dependencies: ["TollKit"]
+            dependencies: ["TollKit"],
+            resources: [.copy("Resources")]
         ),
     ]
 )
