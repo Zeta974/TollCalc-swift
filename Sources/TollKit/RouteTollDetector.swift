@@ -83,6 +83,7 @@ extension TollCalculator {
     public func quote(route: [GeoPoint], vehicle: Vehicle, date: Date? = nil, sanefA1Period: SanefA1Period? = nil,
                       detector: RouteTollDetector? = nil) -> (passages: [TollPassage], quote: TollQuote) {
         let passages = (detector ?? RouteTollDetector(database: database)).passages(along: route)
-        return (passages, quote(stops: passages.map(\.stop), vehicle: vehicle, date: date, sanefA1Period: sanefA1Period))
+        return (passages, quote(stops: passages.map(\.stop), vehicle: vehicle, date: date, sanefA1Period: sanefA1Period,
+                                plazasAreStops: true))
     }
 }

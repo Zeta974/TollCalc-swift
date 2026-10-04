@@ -199,13 +199,19 @@ public struct TollCalculator: Sendable {
     /// longer ticket). Stretches no grid prices are reported as unavailable,
     /// never estimated. `date` is the time of the trip, used by seasonal and
     /// time-of-day prices; without it those come back as ranges.
+    ///
+    /// `plazasAreStops`: the stops come from a route (`RouteTollDetector`), so
+    /// a station found at its toll booths was driven through, and tickets
+    /// change there (see `tickets`). Leave it off for itineraries named by
+    /// hand, where a station in the middle is a waypoint that may be driven past.
     public func quote(stops: [TollStop], vehicle: Vehicle, date: Date? = nil,
-                      sanefA1Period: SanefA1Period? = nil) -> TollQuote {
+                      sanefA1Period: SanefA1Period? = nil, plazasAreStops: Bool = false) -> TollQuote {
         let stops = mergingCombinedPoints(stops)
         var lines: [TollQuote.Line] = []
         var run: [TollStation] = []
         func flush() {
-            lines += tickets(for: run, vehicleClass: vehicle.vehicleClass, sanefA1Period: sanefA1Period)
+            lines += tickets(for: run, vehicleClass: vehicle.vehicleClass, sanefA1Period: sanefA1Period,
+                             plazasAreStops: plazasAreStops)
             run = []
         }
         for stop in stops {
@@ -304,10 +310,47 @@ public struct TollCalculator: Sendable {
     }
 
     /// Fewest consecutive published tickets covering `stations`.
+    ///
+    /// On a route (`plazasAreStops`), a station reached at its toll booths is a stop: the driver pays or
+    /// takes a ticket there (a main-line barrier, or the plaza of an exit
+    /// actually used). A ticket may not run through such a stop, because grids
+    /// also publish fares for other paths between the same two stations (ASF
+    /// prices Toulouse → Peyrehorade by the A62 and A65, 54,90 €, while a trip
+    /// by the A64 pays Muret, Lestelle → Sames and Sames → Peyrehorade). The
+    /// exception is a ticket that costs the same as one side of the stop
+    /// (Mirambeau → Carbon-Blanc = Mirambeau → Virsac barrier, free after it;
+    /// Francazal → Muret nord = Francazal → Muret barrier, paid once).
+    /// Stations found only by their interchange can be driven past, so they
+    /// never split a ticket.
     private func tickets(for stations: [TollStation], vehicleClass: VehicleClass,
-                         sanefA1Period: SanefA1Period?) -> [TollQuote.Line] {
+                         sanefA1Period: SanefA1Period?, plazasAreStops: Bool) -> [TollQuote.Line] {
         let path = group(stations)
         guard path.count >= 2 else { return [] }
+        let isStop = path.map { group in plazasAreStops && group.contains { !$0.booths.isEmpty } }
+        var cache: [Int: TollQuote.Line?] = [:]
+        func priced(_ i: Int, _ j: Int) -> TollQuote.Line? {
+            let key = i * path.count + j
+            if let known = cache[key] { return known }
+            let line = fare(from: path[i], to: path[j], vehicleClass: vehicleClass, sanefA1Period: sanefA1Period)
+            cache[key] = line
+            return line
+        }
+        /// Whether the ticket i → j may run through stop k: when it costs the
+        /// same as the part before k or the part after k, that part already
+        /// includes what is paid at k and the rest is free.
+        /// A plaza with several names (Toulouse sud/ouest and sud/est) is gone
+        /// through under one of them: any name that fits is enough, and it
+        /// tells which (Arles → Le Palays costs Arles → sud/ouest).
+        func mayRunThrough(_ k: Int, _ i: Int, _ j: Int, _ whole: TollQuote.Line) -> Bool {
+            guard let total = whole.amount.bounds else { return false }
+            func same(_ part: TollQuote.Line?) -> Bool {
+                part?.amount.bounds.map { $0.0 == total.0 && $0.1 == total.1 } ?? false
+            }
+            return path[k].contains { name in
+                same(fare(from: path[i], to: [name], vehicleClass: vehicleClass, sanefA1Period: sanefA1Period))
+                    || same(fare(from: [name], to: path[j], vehicleClass: vehicleClass, sanefA1Period: sanefA1Period))
+            }
+        }
         // Shortest path over a DAG: node i = "a ticket ends at path[i]". A
         // priced ticket costs 1; an unpriced hop between neighbours costs a
         // lot, so it is only used when nothing published covers that stretch.
@@ -320,8 +363,9 @@ public struct TollCalculator: Sendable {
             for j in (i + 1)..<n {
                 let line: TollQuote.Line
                 let cost: Int
-                if let priced = fare(from: path[i], to: path[j], vehicleClass: vehicleClass, sanefA1Period: sanefA1Period) {
-                    line = priced
+                if let ticket = priced(i, j),
+                   ((i + 1)..<j).allSatisfy({ !isStop[$0] || mayRunThrough($0, i, j, ticket) }) {
+                    line = ticket
                     cost = 1
                 } else if j == i + 1 {
                     let entry = path[i][0], exit = path[j][0]
